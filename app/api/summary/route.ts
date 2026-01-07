@@ -1,43 +1,46 @@
-import { OpenAI } from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { DEFAULT_PROMPTS } from "@/lib/prompts";
+
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export async function POST(request: NextRequest) {
   try {
-    const { context } = await request.json();
-    
-    const apiKey = process.env.OPENAI_API_KEY;
+    const { context, customPrompt } = await request.json();
+
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json({ error: "OpenAI API key is missing" }, { status: 500 });
+      return NextResponse.json({ error: "Gemini API key is missing" }, { status: 500 });
     }
 
     if (!context) {
       return NextResponse.json({ summary: "No content to summarize." });
     }
 
-    const openai = new OpenAI({ apiKey });
-    const model = "gpt-4o-mini"; // Efficient model without reasoning overhead
+    const ai = new GoogleGenAI({ apiKey });
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
-    const response = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { 
-            role: "system", 
-            content: "You are an expert research assistant. Analyze the provided context and provide a comprehensive summary. \n\nStructure:\n1. A brief 1-2 sentence overview.\n2. 3-5 key bullet points highlighting the most important facts or insights.\n3. A concluding sentence.\n\nKeep it professional, concise, and easy to read." 
-        },
-        { role: "user", content: `Context:\n${context}` }
+    // Use custom prompt if provided, otherwise use default
+    const systemPrompt = customPrompt || DEFAULT_PROMPTS.summary.defaultPrompt;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Understood. I will provide a structured, professional summary." }] },
+        { role: "user", parts: [{ text: `Context:\n${context}` }] },
       ],
-      max_completion_tokens: 1000,
-      temperature: 0.7,
     });
 
-    const summary = response.choices[0]?.message?.content;
-    
+    const parts = response.candidates?.[0]?.content?.parts;
+    const summary = parts?.find((part: { text?: string }) => part.text)?.text;
+
     if (!summary) {
-      console.error("[Summary] Empty response from OpenAI");
-      throw new Error("OpenAI returned empty summary content");
+      console.error("[Summary] Empty response from Gemini");
+      throw new Error("Gemini returned empty summary content");
     }
-    
+
     return NextResponse.json({ summary });
   } catch (error) {
     console.error("[Summary] Error:", error);

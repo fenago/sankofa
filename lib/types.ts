@@ -77,3 +77,29 @@ export interface AudioScript {
   voiceId: string;
   text: string;
 }
+
+// Concept Visualizer Types
+export type VisualizationMode = 'mermaid' | 'image';
+export type DiagramType = 'flowchart' | 'mindmap' | 'sequence' | 'classDiagram' | 'stateDiagram';
+export type ModelTier = 'standard' | 'pro';
+export type ResponseLength = 'short' | 'medium' | 'detailed';
+
+export interface ConceptVisualization {
+  notebookId: string;
+  generatedAt: number;
+  mode: VisualizationMode;
+  diagramType?: DiagramType;
+  mermaidSyntax?: string;
+  imageData?: string;
+  imageMimeType?: string;
+  title: string;
+}
+
+// Video Studio Types
+export interface VideoGeneration {
+  operationName: string;
+  status: 'pending' | 'generating' | 'complete' | 'error';
+  videoUri?: string;
+  createdAt: number;
+  error?: string;
+}

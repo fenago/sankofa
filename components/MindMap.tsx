@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, memo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -39,7 +39,7 @@ interface MindMapProps {
   edges?: Edge[];
 }
 
-export function MindMap({ data, nodes: initialNodesProp, edges: initialEdgesProp }: MindMapProps) {
+function MindMapInner({ data, nodes: initialNodesProp, edges: initialEdgesProp }: MindMapProps) {
   const startNodes = useMemo(() => initialNodesProp ?? defaultNodes, [initialNodesProp]);
   const startEdges = useMemo(() => initialEdgesProp ?? defaultEdges, [initialEdgesProp]);
 
@@ -116,3 +116,6 @@ export function MindMap({ data, nodes: initialNodesProp, edges: initialEdgesProp
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders that trigger React Flow warnings
+export const MindMap = memo(MindMapInner);

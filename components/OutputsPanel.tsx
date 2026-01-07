@@ -5,6 +5,9 @@ import { Play, Pause, FileText, Share2, Download, Loader2, ChevronDown, ChevronU
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MindMap } from "./MindMap";
+import { VisualizerSection } from "./VisualizerSection";
+import { VideoStudio } from "./VideoStudio";
+import { Source } from "@/lib/types";
 
 function FormattedSummary({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -61,6 +64,7 @@ function FormattedSummary({ text }: { text: string }) {
 }
 
 interface OutputsPanelProps {
+  sources: Source[];
   summary: string | null;
   slides: any[];
   audioUrl: string | null;
@@ -68,12 +72,15 @@ interface OutputsPanelProps {
   isGeneratingAudio: boolean;
   isGeneratingSlides: boolean;
   isGeneratingMindmap: boolean;
+  isGeneratingSummary: boolean;
   onGenerateAudio: () => void;
   onGenerateSlides: () => void;
   onGenerateMindmap: () => void;
+  onGenerateSummary: () => void;
 }
 
 export function OutputsPanel({
+  sources,
   summary,
   slides,
   audioUrl,
@@ -81,9 +88,11 @@ export function OutputsPanel({
   isGeneratingAudio,
   isGeneratingSlides,
   isGeneratingMindmap,
+  isGeneratingSummary,
   onGenerateAudio,
   onGenerateSlides,
   onGenerateMindmap,
+  onGenerateSummary,
 }: OutputsPanelProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
@@ -102,7 +111,7 @@ export function OutputsPanel({
   const handleDownloadSlides = () => {
     if (slides.length === 0) return;
 
-    const content = slides.map(slide => 
+    const content = slides.map(slide =>
       `# ${slide.title}\n${slide.bullets.map((b: string) => `* ${b}`).join('\n')}\n`
     ).join('\n---\n\n');
 
@@ -111,6 +120,67 @@ export function OutputsPanel({
     const a = document.createElement('a');
     a.href = url;
     a.download = 'presentation-slides.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadMindmap = () => {
+    if (!mindmapData) return;
+
+    // Get the SVG from the ReactFlow container
+    const svgElement = document.querySelector('.react-flow svg.react-flow__edges')?.closest('svg');
+    const viewportElement = document.querySelector('.react-flow__viewport');
+
+    if (viewportElement) {
+      // Create an SVG from the viewport content
+      const nodes = document.querySelectorAll('.react-flow__nodes');
+      const edges = document.querySelector('.react-flow__edges');
+
+      // Clone and create a standalone SVG
+      const container = document.querySelector('.react-flow');
+      if (container) {
+        const bbox = container.getBoundingClientRect();
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', String(bbox.width));
+        svg.setAttribute('height', String(bbox.height));
+        svg.setAttribute('viewBox', `0 0 ${bbox.width} ${bbox.height}`);
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        // Add a white background
+        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bg.setAttribute('width', '100%');
+        bg.setAttribute('height', '100%');
+        bg.setAttribute('fill', '#f9fafb');
+        svg.appendChild(bg);
+
+        // Clone the viewport
+        const clonedViewport = viewportElement.cloneNode(true) as Element;
+        svg.appendChild(clonedViewport);
+
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([svgData], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mindmap.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    }
+  };
+
+  const handleDownloadSummary = () => {
+    if (!summary) return;
+
+    const blob = new Blob([summary], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'research-summary.md';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -179,15 +249,28 @@ export function OutputsPanel({
       <section className="min-h-[400px] h-[400px] flex flex-col relative group">
         <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-black">Mindmap Preview</h3>
-            <Button 
-                size="sm" 
-                variant="outline" 
+            <div className="flex gap-2">
+              {mindmapData && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDownloadMindmap}
+                  className="text-xs h-8 text-black hover:bg-gray-100"
+                  title="Download as SVG"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={onGenerateMindmap}
                 disabled={isGeneratingMindmap}
                 className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
-            >
+              >
                 {isGeneratingMindmap ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate"}
-            </Button>
+              </Button>
+            </div>
         </div>
         <div className="flex-1 w-full">
           <MindMap data={mindmapData} /> 
@@ -196,7 +279,31 @@ export function OutputsPanel({
 
       {/* Research Summary */}
       <section className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-        <h3 className="text-lg font-semibold text-black mb-2">Research Summary</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-black">Research Summary</h3>
+          <div className="flex gap-2">
+            {summary && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleDownloadSummary}
+                className="text-xs h-8 text-black hover:bg-gray-100"
+                title="Download as Markdown"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onGenerateSummary}
+              disabled={isGeneratingSummary}
+              className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
+            >
+              {isGeneratingSummary ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate"}
+            </Button>
+          </div>
+        </div>
         <FormattedSummary text={summary || ""} />
       </section>
 
@@ -246,6 +353,16 @@ export function OutputsPanel({
                 No slides generated
             </div>
         )}
+      </section>
+
+      {/* Concept Visualizer */}
+      <section className="bg-gray-50 rounded-xl border border-gray-200">
+        <VisualizerSection sources={sources} />
+      </section>
+
+      {/* Video Studio */}
+      <section className="bg-gray-50 rounded-xl border border-gray-200">
+        <VideoStudio sources={sources} />
       </section>
     </div>
   );

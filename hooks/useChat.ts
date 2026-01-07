@@ -1,15 +1,20 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Message, Source } from "@/lib/types";
+import { Message, Source, ResponseLength } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { streamChatCompletion } from "@/lib/api/claude";
 
-export function useChat(sources: Source[]) {
+interface UseChatOptions {
+  responseLength?: ResponseLength;
+}
+
+export function useChat(sources: Source[], options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState("");
+  const [responseLength, setResponseLength] = useState<ResponseLength>(options.responseLength || "detailed");
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -37,32 +42,37 @@ export function useChat(sources: Source[]) {
       let fullResponse = "";
 
       try {
-        await streamChatCompletion(content.trim(), sources, {
-          onStart: () => {
-            setStreamingContent("");
-          },
-          onToken: (token: string) => {
-            fullResponse += token;
-            setStreamingContent(fullResponse);
-          },
-          onComplete: (finalText: string) => {
-            const assistantMessage: Message = {
-              id: assistantMessageId,
-              role: "assistant",
-              content: finalText || fullResponse,
-              timestamp: Date.now(),
-            };
+        await streamChatCompletion(
+          content.trim(),
+          sources,
+          {
+            onStart: () => {
+              setStreamingContent("");
+            },
+            onToken: (token: string) => {
+              fullResponse += token;
+              setStreamingContent(fullResponse);
+            },
+            onComplete: (finalText: string) => {
+              const assistantMessage: Message = {
+                id: assistantMessageId,
+                role: "assistant",
+                content: finalText || fullResponse,
+                timestamp: Date.now(),
+              };
 
-            setMessages((prev) => [...prev, assistantMessage]);
-            setStreamingContent("");
-            setIsLoading(false);
+              setMessages((prev) => [...prev, assistantMessage]);
+              setStreamingContent("");
+              setIsLoading(false);
+            },
+            onError: (err: Error) => {
+              setError(err.message);
+              setIsLoading(false);
+              setStreamingContent("");
+            },
           },
-          onError: (err: Error) => {
-            setError(err.message);
-            setIsLoading(false);
-            setStreamingContent("");
-          },
-        });
+          { responseLength }
+        );
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Failed to send message";
@@ -71,7 +81,7 @@ export function useChat(sources: Source[]) {
         setStreamingContent("");
       }
     },
-    [sources, isLoading]
+    [sources, isLoading, responseLength]
   );
 
   const clearMessages = useCallback(() => {
@@ -87,5 +97,7 @@ export function useChat(sources: Source[]) {
     streamingContent,
     sendMessage,
     clearMessages,
+    responseLength,
+    setResponseLength,
   };
 }

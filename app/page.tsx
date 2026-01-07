@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { SourcesPanel } from "@/components/SourcesPanel";
 import { ChatInterface } from "@/components/ChatInterface";
 import { OutputsPanel } from "@/components/OutputsPanel";
-import { Source, Message } from "@/lib/types";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { Source, Message, ResponseLength } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { CustomPrompts, getStoredPrompts, getPrompt } from "@/lib/prompts";
 
 export default function Home() {
   const { toast } = useToast();
@@ -26,6 +28,17 @@ export default function Home() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
   const [isGeneratingMindmap, setIsGeneratingMindmap] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [responseLength, setResponseLength] = useState<ResponseLength>("detailed");
+
+  // Settings State
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [customPrompts, setCustomPrompts] = useState<CustomPrompts>({});
+
+  // Load custom prompts from localStorage on mount
+  useEffect(() => {
+    setCustomPrompts(getStoredPrompts());
+  }, []);
 
   // Handlers
   const generateSummary = async (currentSources: Source[]) => {
@@ -34,8 +47,12 @@ export default function Home() {
       .map((s) => `Title: ${s.title}\nContent: ${s.text?.slice(0, 2000)}`)
       .join("\n\n");
 
-    if (!context) return;
+    if (!context) {
+      toast({ title: "No sources to summarize", description: "Add sources first.", variant: "destructive" });
+      return;
+    }
 
+    setIsGeneratingSummary(true);
     try {
       setSummary("Generating summary...");
       const res = await fetch("/api/summary", {
@@ -43,13 +60,13 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ context }),
       });
-      
+
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to generate summary");
       }
-      
+
       if (data.summary) {
         setSummary(data.summary);
       } else {
@@ -57,12 +74,14 @@ export default function Home() {
       }
     } catch (e) {
       console.error("Summary generation failed", e);
-      setSummary("Failed to generate summary.");
+      setSummary(null);
       toast({
         title: "Failed to generate summary",
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive"
       });
+    } finally {
+      setIsGeneratingSummary(false);
     }
   };
 
@@ -206,7 +225,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [...messages, newMessage].map(m => ({ role: m.role, content: m.content })),
-          context
+          context,
+          responseLength
         }),
       });
 
@@ -241,39 +261,69 @@ export default function Home() {
   };
 
   const handleGenerateAudio = async () => {
-    if (!summary && messages.length === 0) {
+    const successfulSources = sources.filter(s => s.status === "success" && s.text);
+
+    if (!summary && messages.length === 0 && successfulSources.length === 0) {
         toast({ title: "Nothing to generate audio from", description: "Add sources or chat first." });
         return;
     }
-    
+
     setIsGeneratingAudio(true);
     try {
-        const textToSpeak = summary || messages[messages.length - 1]?.content || "No content available.";
-        
-        const res = await fetch("/api/audio", {
+        // Priority: summary > source text > last chat message
+        let sourceContent = summary;
+        if (!sourceContent && successfulSources.length > 0) {
+            // Use first source's text if no summary yet
+            sourceContent = successfulSources[0].text?.slice(0, 3000) || "";
+        }
+        if (!sourceContent) {
+            sourceContent = messages[messages.length - 1]?.content || "No content available.";
+        }
+
+        // Step 1: Generate conversational script from content
+        toast({ title: "Generating script...", description: "Creating conversational audio script" });
+        const scriptRes = await fetch("/api/audio-script", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: textToSpeak.slice(0, 1000) }), // Limit length for demo
+            body: JSON.stringify({
+                content: sourceContent,
+                customPrompt: customPrompts.audioScript
+            }),
         });
 
-        if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 401 && data.error?.includes("missing_permissions")) {
-            throw new Error("API Key missing 'text_to_speech' permission");
+        if (!scriptRes.ok) {
+            const data = await scriptRes.json().catch(() => ({}));
+            throw new Error(data.error || "Script generation failed");
         }
-        throw new Error(data.error || "Audio generation failed");
-      }
 
-        const blob = await res.blob();
+        const { script } = await scriptRes.json();
+
+        // Step 2: Convert script to speech using ElevenLabs
+        toast({ title: "Generating audio...", description: "Converting script to speech" });
+        const audioRes = await fetch("/api/audio", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: script }),
+        });
+
+        if (!audioRes.ok) {
+            const data = await audioRes.json().catch(() => ({}));
+            if (audioRes.status === 401 && data.error?.includes("missing_permissions")) {
+                throw new Error("API Key missing 'text_to_speech' permission");
+            }
+            throw new Error(data.error || "Audio generation failed");
+        }
+
+        const blob = await audioRes.blob();
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
-        toast({ title: "Audio generated" });
+        toast({ title: "Audio generated", description: "Your podcast-style overview is ready!" });
     } catch (error) {
         console.error(error);
-        toast({ 
-            title: "Audio generation failed", 
+        toast({
+            title: "Audio generation failed",
             description: error instanceof Error ? error.message : "Unknown error",
-            variant: "destructive" 
+            variant: "destructive"
         });
     } finally {
         setIsGeneratingAudio(false);
@@ -345,7 +395,14 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-white text-black font-sans overflow-hidden">
-      <Navbar />
+      <Navbar onSettingsClick={() => setSettingsOpen(true)} />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        customPrompts={customPrompts}
+        onPromptsChange={setCustomPrompts}
+      />
       
       {/* Mobile Tab Navigation */}
       <div className="lg:hidden flex border-b border-gray-200 bg-gray-50">
@@ -391,19 +448,22 @@ export default function Home() {
 
         {/* Middle: Chat */}
         <div className={`${mobileTab === "chat" ? "block" : "hidden"} lg:block lg:col-span-5 border-r border-gray-200 h-full overflow-hidden`}>
-          <ChatInterface 
+          <ChatInterface
             messages={messages}
             streamingContent={streamingContent}
             isLoading={isChatting}
             onSendMessage={handleSendMessage}
             hasSource={sources.length > 0}
+            responseLength={responseLength}
+            onResponseLengthChange={setResponseLength}
           />
         </div>
 
         {/* Right: Outputs */}
         <div className={`${mobileTab === "outputs" ? "block" : "hidden"} lg:block lg:col-span-4 h-full overflow-hidden bg-white`}>
           <div className="h-full overflow-y-auto">
-            <OutputsPanel 
+            <OutputsPanel
+                sources={sources}
                 summary={summary}
                 slides={slides}
                 audioUrl={audioUrl}
@@ -411,9 +471,11 @@ export default function Home() {
                 isGeneratingAudio={isGeneratingAudio}
                 isGeneratingSlides={isGeneratingSlides}
                 isGeneratingMindmap={isGeneratingMindmap}
+                isGeneratingSummary={isGeneratingSummary}
                 onGenerateAudio={handleGenerateAudio}
                 onGenerateSlides={handleGenerateSlides}
                 onGenerateMindmap={handleGenerateMindmap}
+                onGenerateSummary={() => generateSummary(sources)}
             />
           </div>
         </div>

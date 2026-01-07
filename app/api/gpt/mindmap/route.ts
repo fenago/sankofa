@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 import { Source } from "@/lib/types";
+import { DEFAULT_PROMPTS } from "@/lib/prompts";
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_MODEL = "gpt-4o-mini"; // Switch to gpt-4o-mini for reliable JSON
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function buildContentFromSources(sources: Source[], maxChars = 4000) {
   const payload = sources
@@ -20,78 +21,66 @@ function buildContentFromSources(sources: Source[], maxChars = 4000) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { notebookId, sources } = await request.json();
+    const { notebookId, sources, customPrompt } = await request.json();
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("[Mindmap] OpenAI API key is missing");
+      console.error("[Mindmap] Gemini API key is missing");
       return NextResponse.json(
-        { error: "OpenAI API key is missing" },
+        { error: "Gemini API key is missing" },
         { status: 500 }
       );
     }
 
-    // Use gpt-5-nano with full model identifier
-    const model = process.env.OPENAI_SUMMARY_MODEL || DEFAULT_MODEL;
+    const ai = new GoogleGenAI({ apiKey });
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
     const content = buildContentFromSources(sources, 4000);
 
-    const response = await fetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    // Use custom prompt if provided, otherwise use default
+    const systemPrompt = customPrompt || DEFAULT_PROMPTS.mindmap.defaultPrompt;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Understood. I will output only valid JSON in the specified mindmap structure." }] },
+        { role: "user", parts: [{ text: content }] },
+      ],
+      config: {
+        responseMimeType: "application/json",
       },
-      body: JSON.stringify({
-        model,
-        max_completion_tokens: 8000,
-        messages: [
-          {
-            role: "system",
-            content:
-              'You produce concise mindmaps. Output ONLY valid JSON with this EXACT structure: {"root": {"title": "Main Topic", "children": [{"title": "Subtopic 1"}, {"title": "Subtopic 2", "children": [{"title": "Detail"}]}]}}. EVERY node MUST have a "title" string property. Keep hierarchy shallow (max 3 levels) and informative.',
-          },
-          { role: "user", content },
-        ],
-        response_format: { type: "json_object" },
-      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Mindmap] OpenAI API error:", errorText);
-      return NextResponse.json(
-        { error: errorText || "Failed to generate mindmap" },
-        { status: response.status }
-      );
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!parts || parts.length === 0) {
+      console.error("[Mindmap] No content parts in response");
+      throw new Error("No content generated");
     }
 
-    const data = await response.json();
-    console.log("[Mindmap] Full OpenAI response:", JSON.stringify(data, null, 2));
+    let rawContent = parts.find((part: { text?: string }) => part.text)?.text || "{}";
+    console.log("[Mindmap] Raw content from Gemini:", rawContent);
 
-    let rawContent = data.choices?.[0]?.message?.content || "{}";
-    console.log("[Mindmap] Raw content from OpenAI:", rawContent);
-
-    // Cleanup markdown code blocks if present (more robust regex)
+    // Cleanup markdown code blocks if present
     rawContent = rawContent.replace(/```json\s*|\s*```/g, "").trim();
 
     let parsed;
     try {
-        parsed = JSON.parse(rawContent);
+      parsed = JSON.parse(rawContent);
     } catch (e) {
-        console.error("Failed to parse JSON:", rawContent);
-        throw new Error("Failed to parse OpenAI response as JSON");
+      console.error("Failed to parse JSON:", rawContent);
+      throw new Error("Failed to parse Gemini response as JSON");
     }
-    
+
     // Handle case where root object is returned directly or wrapped in "root"
     let rootNode = parsed.root || parsed;
     if (rootNode.title && !rootNode.children) {
-        rootNode.children = [];
+      rootNode.children = [];
     }
 
     // Ensure root node has proper structure
     if (!rootNode || !rootNode.title) {
       console.error("[Mindmap] Invalid root structure:", parsed);
-      throw new Error("Invalid mindmap structure returned from OpenAI");
+      throw new Error("Invalid mindmap structure returned from Gemini");
     }
 
     return NextResponse.json({

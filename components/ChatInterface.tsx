@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SendIcon, Loader2Icon, Sparkles } from "lucide-react";
-import { Message } from "@/lib/types";
+import { Message, ResponseLength } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,15 @@ interface ChatInterfaceProps {
   isLoading: boolean;
   onSendMessage: (content: string) => void;
   hasSource: boolean;
+  responseLength: ResponseLength;
+  onResponseLengthChange: (length: ResponseLength) => void;
 }
+
+const RESPONSE_LENGTH_OPTIONS: { value: ResponseLength; label: string }[] = [
+  { value: "short", label: "Short" },
+  { value: "medium", label: "Medium" },
+  { value: "detailed", label: "Detailed" },
+];
 
 export function ChatInterface({
   messages,
@@ -22,6 +30,8 @@ export function ChatInterface({
   isLoading,
   onSendMessage,
   hasSource,
+  responseLength,
+  onResponseLengthChange,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -111,6 +121,26 @@ export function ChatInterface({
 
       {/* Input Area */}
       <div className="relative">
+        {/* Response Length Selector */}
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <span className="text-xs text-gray-500 mr-2">Response length:</span>
+          <div className="inline-flex rounded-full bg-gray-100 p-0.5">
+            {RESPONSE_LENGTH_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onResponseLengthChange(option.value)}
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                  responseLength === option.value
+                    ? "bg-black text-white shadow-sm"
+                    : "text-gray-600 hover:text-black"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="relative max-w-3xl mx-auto">
           <Input
             placeholder={hasSource ? "Ask a question about your sources..." : "Add a source to start chatting"}

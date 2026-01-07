@@ -1,52 +1,98 @@
-import { OpenAI } from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { DEFAULT_PROMPTS } from "@/lib/prompts";
+import { ResponseLength } from "@/lib/types";
+
+const DEFAULT_MODEL = "gemini-2.5-flash";
+
+const RESPONSE_LENGTH_INSTRUCTIONS: Record<ResponseLength, string> = {
+  short: `
+Keep your response brief and to the point (2-3 sentences).
+Only include the most essential information.`,
+  medium: `
+Provide a balanced response with moderate detail (1-2 paragraphs).
+Include key points and some supporting details.`,
+  detailed: `
+Provide a comprehensive, detailed response.
+Include thorough explanations, examples, and supporting details.
+Structure your response with clear sections when appropriate.
+Aim for 3-5 paragraphs or more if the topic warrants it.`
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, context } = await request.json();
+    const { messages, context, enableImageGeneration, customPrompt, responseLength } = await request.json() as {
+      messages: { role: string; content: string }[];
+      context?: string;
+      enableImageGeneration?: boolean;
+      customPrompt?: string;
+      responseLength?: ResponseLength;
+    };
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OpenAI API key is missing" },
+        { error: "Gemini API key is missing" },
         { status: 500 }
       );
     }
 
-    const openai = new OpenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey });
 
-    const systemPrompt = `
-You are LearnGraph, an advanced research assistant powered by DrLee.AI.
-You have access to the following source context:
-${context || "No specific source context provided."}
+    // Use custom prompt if provided, otherwise use default
+    const basePrompt = customPrompt || DEFAULT_PROMPTS.chat.defaultPrompt;
+    // Replace {{context}} placeholder with actual context
+    const lengthInstruction = RESPONSE_LENGTH_INSTRUCTIONS[responseLength || "detailed"];
+    const systemPrompt = basePrompt.replace("{{context}}", context || "No specific source context provided.") +
+      lengthInstruction +
+      (enableImageGeneration ? "\nYou can generate images when it would help explain concepts. When generating images, describe what you're creating." : "");
 
-Answer the user's questions based on this context. 
-If the context is irrelevant, answer from your general knowledge but mention that it's outside the provided sources.
-Be concise, helpful, and professional.
-`;
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
-    // Use gpt-5-nano with full model identifier
-    const model = "gpt-5-nano-2025-08-07";
+    // Convert messages to Gemini format
+    const geminiMessages = messages.map((msg: { role: string; content: string }) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
 
-    const stream = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages,
-      ],
-      stream: true,
+    // Add system instruction as the first user message if needed
+    const contents = [
+      { role: "user", parts: [{ text: systemPrompt }] },
+      { role: "model", parts: [{ text: "Understood. I'm LearnGraph, ready to help with questions based on the provided sources." }] },
+      ...geminiMessages,
+    ];
+
+    // Use streaming for text responses
+    const streamResponse = await ai.models.generateContentStream({
+      model: enableImageGeneration ? "gemini-2.5-flash-preview-04-17" : model,
+      contents,
+      config: enableImageGeneration ? {
+        responseModalities: ["TEXT", "IMAGE"],
+      } : undefined,
     });
 
-    // Create a ReadableStream from the OpenAI stream
+    // Create a ReadableStream from the Gemini stream
     const readableStream = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
-            controller.enqueue(new TextEncoder().encode(content));
+        try {
+          for await (const chunk of streamResponse) {
+            const parts = chunk.candidates?.[0]?.content?.parts;
+            if (parts) {
+              for (const part of parts) {
+                if (part.text) {
+                  controller.enqueue(new TextEncoder().encode(part.text));
+                } else if (part.inlineData) {
+                  // For image data, send as a special marker
+                  const imageMarker = `\n[IMAGE:data:${part.inlineData.mimeType};base64,${part.inlineData.data}]\n`;
+                  controller.enqueue(new TextEncoder().encode(imageMarker));
+                }
+              }
+            }
           }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
         }
-        controller.close();
       },
     });
 

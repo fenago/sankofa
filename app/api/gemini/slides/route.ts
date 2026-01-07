@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { Source } from "@/lib/types";
+import { DEFAULT_PROMPTS } from "@/lib/prompts";
 
 const DEFAULT_MODEL = "gemini-3-pro-image-preview"; // Exact match from user example
 
@@ -20,7 +21,7 @@ function buildContentFromSources(sources: Source[], maxChars = 5000) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { notebookId, sources } = await request.json();
+    const { notebookId, sources, customPrompt } = await request.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -35,32 +36,13 @@ export async function POST(request: NextRequest) {
     const ai = new GoogleGenAI({ apiKey });
     
     const model = DEFAULT_MODEL;
-    
+
     const sourceContent = buildContentFromSources(sources);
-    
-    // Build prompt for slide generation
-    const prompt = `You are an expert presentation designer.
-Create a slide deck outline based on the provided source content.
 
-Sources:
-${sourceContent}
-
-Instructions:
-- Create 5-8 slides
-- Each slide should have a "title" and a list of "bullets" (2-4 bullets per slide)
-- Be concise, professional, and impactful
-- Do not include filler text
-- Return ONLY valid JSON matching this exact structure:
-{
-  "slides": [
-    {
-      "title": "Slide Title Here",
-      "bullets": ["Point 1", "Point 2", "Point 3"]
-    }
-  ]
-}
-
-Return ONLY the JSON, no other text.`;
+    // Use custom prompt if provided, otherwise use default
+    // Replace {{sources}} placeholder with actual source content
+    const basePrompt = customPrompt || DEFAULT_PROMPTS.slides.defaultPrompt;
+    const prompt = basePrompt.replace("{{sources}}", sourceContent);
 
     // Create chat and send message
     const chat = ai.chats.create({

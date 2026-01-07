@@ -1,7 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface NavbarProps {
+  onSettingsClick?: () => void;
+}
 
 function LearnGraphLogo({ size = 20 }: { size?: number }) {
   return (
@@ -24,7 +28,7 @@ function LearnGraphLogo({ size = 20 }: { size?: number }) {
   );
 }
 
-export function Navbar() {
+export function Navbar({ onSettingsClick }: NavbarProps) {
   return (
     <header className="grid grid-cols-3 items-center px-3 sm:px-6 py-2 sm:py-3 border-b border-gray-200 bg-white text-black">
       {/* Left: LearnGraph branding */}
@@ -53,6 +57,15 @@ export function Navbar() {
 
       {/* Right: Actions */}
       <div className="flex items-center justify-end gap-2 sm:gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 sm:h-9 sm:w-9 text-gray-600 hover:text-black hover:bg-gray-100"
+          onClick={onSettingsClick}
+          title="Settings"
+        >
+          <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+        </Button>
         <Button
           variant="outline"
           className="bg-black text-white hover:bg-gray-800 hover:text-white border-none font-medium h-8 sm:h-9 px-2 sm:px-4 gap-1 sm:gap-2 text-xs sm:text-sm"

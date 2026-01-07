@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 import { Source } from "@/lib/types";
+import { DEFAULT_PROMPTS } from "@/lib/prompts";
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function buildContentFromSources(sources: Source[], maxChars = 4000) {
   const payload = sources
@@ -20,55 +21,48 @@ function buildContentFromSources(sources: Source[], maxChars = 4000) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { notebookId, sources } = await request.json();
+    const { notebookId, sources, customPrompt } = await request.json();
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("[Overview] OpenAI API key is missing");
+      console.error("[Overview] Gemini API key is missing");
       return NextResponse.json(
-        { error: "OpenAI API key is missing" },
+        { error: "Gemini API key is missing" },
         { status: 500 }
       );
     }
 
-    const model = process.env.OPENAI_SUMMARY_MODEL || DEFAULT_MODEL;
+    const ai = new GoogleGenAI({ apiKey });
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
     const content = buildContentFromSources(sources, 3000);
 
-    const response = await fetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    // Use custom prompt if provided, otherwise use default
+    const systemPrompt = customPrompt || DEFAULT_PROMPTS.overview.defaultPrompt;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Understood. I will respond with JSON containing bullets and keyStats arrays." }] },
+        { role: "user", parts: [{ text: content }] },
+      ],
+      config: {
+        responseMimeType: "application/json",
       },
-      body: JSON.stringify({
-        model,
-        max_completion_tokens: 512,
-        messages: [
-          {
-            role: "system",
-            content:
-              'You summarize user-provided extracts. Respond with JSON {"bullets": string[], "keyStats": string[]}. Be concise, bullet-first, cite source numbers like (Source 1).',
-          },
-          {
-            role: "user",
-            content,
-          },
-        ],
-        response_format: { type: "json_object" },
-      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Overview] OpenAI API error:", errorText);
-      return NextResponse.json(
-        { error: errorText || "Failed to generate overview" },
-        { status: response.status }
-      );
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!parts || parts.length === 0) {
+      console.error("[Overview] No content parts in response");
+      throw new Error("No content generated");
     }
 
-    const data = await response.json();
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    let rawContent = parts.find((part: { text?: string }) => part.text)?.text || "{}";
+
+    // Cleanup markdown code blocks if present
+    rawContent = rawContent.replace(/```json\s*|\s*```/g, "").trim();
+
+    const parsed = JSON.parse(rawContent);
 
     return NextResponse.json({
       notebookId,
