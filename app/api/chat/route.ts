@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const openai = new OpenAI({ apiKey });
 
     const systemPrompt = `
-You are HyperbookLM, an advanced research assistant.
+You are LearnGraph, an advanced research assistant powered by DrLee.AI.
 You have access to the following source context:
 ${context || "No specific source context provided."}
 

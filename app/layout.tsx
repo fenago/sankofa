@@ -17,11 +17,11 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HyperbookLM",
+  title: "LearnGraph",
   description:
-    "Powered by Hyperbrowser + GPT-5.2 - Research notebook with summaries, mindmaps, and media overviews.",
+    "Powered by DrLee.AI - Research notebook with summaries, mindmaps, and media overviews.",
   icons: {
-    icon: "/hyperbrowser_symbol-light.svg",
+    icon: "/learngraph-icon.svg",
   },
 };
 

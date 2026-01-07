@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model,
-        max_completion_tokens: 2000,
+        max_completion_tokens: 8000,
         messages: [
           {
             role: "system",
@@ -66,8 +66,11 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+    console.log("[Mindmap] Full OpenAI response:", JSON.stringify(data, null, 2));
+
     let rawContent = data.choices?.[0]?.message?.content || "{}";
-    
+    console.log("[Mindmap] Raw content from OpenAI:", rawContent);
+
     // Cleanup markdown code blocks if present (more robust regex)
     rawContent = rawContent.replace(/```json\s*|\s*```/g, "").trim();
 

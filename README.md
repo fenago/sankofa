@@ -1,20 +1,20 @@
-**Built with [Hyperbrowser](https://hyperbrowser.ai)**
+**Powered by [DrLee.AI](https://drlee.ai)**
 
-# HyperbookLM
+# LearnGraph
 
 A powerful research assistant built with Next.js 15, React 19, and Hyperbrowser. It allows users to aggregate diverse sources (Web URLs, PDFs) and gain deep insights through interactive AI tools.
 
 
 ## Features
 
-- **Multi-Source Ingestion**: 
+- **Multi-Source Ingestion**:
   - **Scrape Web URLs**: Instantly extract content from any website using **Hyperbrowser**.
   - **PDF Uploads**: Parse and analyze PDF documents client-side.
 - **Deep Research Analysis**:
-  - **AI Research Summary**: Generates comprehensive summaries with key insights 
+  - **AI Research Summary**: Generates comprehensive summaries with key insights
   - **Interactive Mindmap**: Visualizes relationships between concepts using React Flow.
   - **Audio Overview**: Generates a podcast-style audio summary (`ElevenLabs`).
-  - **Presentation Slides**: Auto-generates slide decks from your sources 
+  - **Presentation Slides**: Auto-generates slide decks from your sources
 - **Interactive Chat**: Ask questions about your sources with streaming AI responses
 
 
@@ -23,7 +23,7 @@ A powerful research assistant built with Next.js 15, React 19, and Hyperbrowser.
 - **Framework**: Next.js 15 (App Router)
 - **UI Library**: React 19, Tailwind CSS, shadcn/ui, Framer Motion
 - **Web Scraping**: [Hyperbrowser SDK](https://hyperbrowser.ai)
-- **AI Models**: 
+- **AI Models**:
   - **OpenAI**: `gpt-5-nano` (Chat), `gpt-4o-mini` (Summary, Mindmap)
   - **Google Gemini**: `gemini-3-pro-image-preview` (Slides)
   - **ElevenLabs**: `eleven_turbo_v2_5` (Audio)
@@ -45,8 +45,8 @@ You'll need API keys for the following services:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/hyperbrowserai/hyperbooklm.git
-   cd hyperbooklm
+   git clone https://github.com/drlee-ai/learngraph.git
+   cd learngraph
    ```
 
 2. **Install dependencies**:
@@ -87,7 +87,7 @@ You'll need API keys for the following services:
 
 ## Growth Use-Cases
 
-This project demonstrates how to build high-value growth tools using Hyperbrowser:
+This project demonstrates how to build high-value growth tools:
 
 - **Content Repurposing**: Scrape blog posts and auto-generate LinkedIn carousels (Slides) or podcasts (Audio).
 - **Competitor Analysis**: Ingest competitor landing pages to generate SWOT analysis mindmaps.
@@ -96,7 +96,7 @@ This project demonstrates how to build high-value growth tools using Hyperbrowse
 ## Project Structure
 
 ```
-hyperbooklm/
+learngraph/
 ├── app/
 │   ├── api/                # Next.js API Routes (Server-side)
 │   │   ├── audio/          # ElevenLabs integration
@@ -125,4 +125,4 @@ MIT
 
 ---
 
-**Follow [@hyperbrowser](https://x.com/hyperbrowser) for updates.**
+**Powered by [DrLee.AI](https://drlee.ai)**

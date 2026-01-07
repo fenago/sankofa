@@ -1,26 +1,25 @@
 "use client";
 
-import { useEffect } from 'react';
-import ReactFlow, { 
-  Node, 
-  Edge, 
-  Controls, 
-  Background, 
-  useNodesState, 
+import { useEffect, useMemo } from 'react';
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
   useEdgesState,
-  MarkerType,
   BackgroundVariant
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-const initialNodes: Node[] = [
-  { 
-    id: '1', 
-    position: { x: 0, y: 0 }, 
+const defaultNodes: Node[] = [
+  {
+    id: '1',
+    position: { x: 0, y: 0 },
     data: { label: 'Research Topic' },
-    style: { 
-        background: '#fff', 
-        color: '#000', 
+    style: {
+        background: '#fff',
+        color: '#000',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
         padding: '10px 20px',
@@ -28,7 +27,11 @@ const initialNodes: Node[] = [
     }
   },
 ];
-const initialEdges: Edge[] = [];
+const defaultEdges: Edge[] = [];
+
+// Define nodeTypes outside component to prevent React Flow warning
+const nodeTypes = {};
+const edgeTypes = {};
 
 interface MindMapProps {
   data?: any;
@@ -36,9 +39,12 @@ interface MindMapProps {
   edges?: Edge[];
 }
 
-export function MindMap({ data, nodes: initialNodesProp = initialNodes, edges: initialEdgesProp = initialEdges }: MindMapProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodesProp);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdgesProp);
+export function MindMap({ data, nodes: initialNodesProp, edges: initialEdgesProp }: MindMapProps) {
+  const startNodes = useMemo(() => initialNodesProp ?? defaultNodes, [initialNodesProp]);
+  const startEdges = useMemo(() => initialEdgesProp ?? defaultEdges, [initialEdgesProp]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(startNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(startEdges);
 
   useEffect(() => {
     if (!data) return;
@@ -100,6 +106,8 @@ export function MindMap({ data, nodes: initialNodesProp = initialNodes, edges: i
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
       >
         <Background color="#9ca3af" gap={40} size={2} variant={BackgroundVariant.Dots} />
