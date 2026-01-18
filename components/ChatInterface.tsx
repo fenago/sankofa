@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SendIcon, Loader2Icon, Sparkles } from "lucide-react";
+import { SendIcon, Loader2Icon, Sparkles, Trash2 } from "lucide-react";
 import { Message, ResponseLength } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 
 interface ChatInterfaceProps {
   messages: Message[];
   streamingContent: string;
   isLoading: boolean;
   onSendMessage: (content: string) => void;
+  onClearChat?: () => void;
   hasSource: boolean;
   responseLength: ResponseLength;
   onResponseLengthChange: (length: ResponseLength) => void;
@@ -29,6 +31,7 @@ export function ChatInterface({
   streamingContent,
   isLoading,
   onSendMessage,
+  onClearChat,
   hasSource,
   responseLength,
   onResponseLengthChange,
@@ -52,6 +55,21 @@ export function ChatInterface({
 
   return (
     <div className="flex h-full flex-col bg-white text-black p-4 gap-4">
+      {/* Messages Header with Clear Button */}
+      {messages.length > 0 && onClearChat && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearChat}
+            className="text-gray-500 hover:text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Clear Chat
+          </Button>
+        </div>
+      )}
+
       {/* Messages Area */}
       <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 overflow-hidden flex flex-col shadow-inner">
         <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
@@ -80,11 +98,17 @@ export function ChatInterface({
                   className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${
-                    message.role === 'user' 
-                      ? 'bg-black text-white rounded-tr-sm' 
+                    message.role === 'user'
+                      ? 'bg-black text-white rounded-tr-sm'
                       : 'bg-white text-black rounded-tl-sm border border-gray-200 shadow-sm'
                   }`}>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    {message.role === 'user' ? (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <div className="text-sm leading-relaxed prose prose-sm prose-gray max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-strong:text-black prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-gray-800 prose-code:before:content-none prose-code:after:content-none">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -102,14 +126,14 @@ export function ChatInterface({
                     <Sparkles className="h-3 w-3 text-black" />
                     <span className="text-xs font-medium uppercase tracking-wider text-black">Generating</span>
                   </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {streamingContent}
+                  <div className="text-sm leading-relaxed prose prose-sm prose-gray max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-strong:text-black prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-gray-800 prose-code:before:content-none prose-code:after:content-none">
+                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
                     <motion.span
                       animate={{ opacity: [0, 1, 0] }}
                       transition={{ repeat: Infinity, duration: 0.8 }}
                       className="inline-block w-1.5 h-4 ml-1 bg-black align-middle"
                     />
-                  </p>
+                  </div>
                 </div>
               </motion.div>
             )}

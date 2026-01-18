@@ -1,13 +1,33 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Pause, FileText, Share2, Download, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Play, Pause, FileText, Share2, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MindMap } from "./MindMap";
 import { VisualizerSection } from "./VisualizerSection";
 import { VideoStudio } from "./VideoStudio";
 import { Source } from "@/lib/types";
+
+// Dynamically import KnowledgeGraphPanel with SSR disabled (React Flow doesn't support SSR)
+const KnowledgeGraphPanel = dynamic(
+  () => import("./KnowledgeGraphPanel").then((mod) => mod.KnowledgeGraphPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Network className="h-5 w-5" />
+          <h3 className="text-lg font-semibold text-black">Knowledge Graph</h3>
+        </div>
+        <div className="h-64 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      </div>
+    ),
+  }
+);
 
 function FormattedSummary({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -64,11 +84,13 @@ function FormattedSummary({ text }: { text: string }) {
 }
 
 interface OutputsPanelProps {
+  notebookId?: string;
   sources: Source[];
   summary: string | null;
   slides: any[];
   audioUrl: string | null;
   mindmapData: any;
+  graphEnhanced?: boolean;
   isGeneratingAudio: boolean;
   isGeneratingSlides: boolean;
   isGeneratingMindmap: boolean;
@@ -80,11 +102,13 @@ interface OutputsPanelProps {
 }
 
 export function OutputsPanel({
+  notebookId,
   sources,
   summary,
   slides,
   audioUrl,
   mindmapData,
+  graphEnhanced,
   isGeneratingAudio,
   isGeneratingSlides,
   isGeneratingMindmap,
@@ -248,7 +272,15 @@ export function OutputsPanel({
       {/* Mindmap Preview */}
       <section className="min-h-[400px] h-[400px] flex flex-col relative group">
         <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-black">Mindmap Preview</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-black">Mindmap Preview</h3>
+              {graphEnhanced && mindmapData && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1 font-medium">
+                  <Sparkles className="h-3 w-3" />
+                  Graph Enhanced
+                </span>
+              )}
+            </div>
             <div className="flex gap-2">
               {mindmapData && (
                 <Button
@@ -364,6 +396,13 @@ export function OutputsPanel({
       <section className="bg-gray-50 rounded-xl border border-gray-200">
         <VideoStudio sources={sources} />
       </section>
+
+      {/* Knowledge Graph - only shown when in a notebook context */}
+      {notebookId && (
+        <section className="bg-gray-50 rounded-xl border border-gray-200">
+          <KnowledgeGraphPanel notebookId={notebookId} />
+        </section>
+      )}
     </div>
   );
 }

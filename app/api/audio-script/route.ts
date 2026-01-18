@@ -1,5 +1,8 @@
+import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_PROMPTS } from "@/lib/prompts";
+
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,46 +15,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OpenAI API key is missing" },
+        { error: "Gemini API key is missing" },
         { status: 500 }
       );
     }
 
     // Use custom prompt or default
     const basePrompt = customPrompt || DEFAULT_PROMPTS.audioScript.defaultPrompt;
-    const systemPrompt = basePrompt.replace("{{content}}", content);
+    const userPrompt = basePrompt.replace("{{content}}", content);
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You are a skilled podcast script writer." },
-          { role: "user", content: systemPrompt },
-        ],
+    const genAI = new GoogleGenAI({ apiKey });
+
+    const response = await genAI.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: userPrompt,
+      config: {
+        systemInstruction: "You are a skilled podcast script writer.",
         temperature: 0.7,
-        max_tokens: 1000,
-      }),
+        maxOutputTokens: 1000,
+      },
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      console.error("[AudioScript] OpenAI API error:", error);
-      return NextResponse.json(
-        { error: error.error?.message || "Failed to generate script" },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    const script = data.choices?.[0]?.message?.content || "";
+    const script = response.text || "";
 
     return NextResponse.json({ script });
   } catch (error) {

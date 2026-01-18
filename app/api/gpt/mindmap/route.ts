@@ -2,8 +2,70 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { Source } from "@/lib/types";
 import { DEFAULT_PROMPTS } from "@/lib/prompts";
+import { isNeo4JAvailable } from "@/lib/graph/neo4j";
+import { getSkillGraph, getEntitiesByNotebook } from "@/lib/graph/store";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
+
+/**
+ * Build structured context from the knowledge graph (if available)
+ */
+async function buildGraphContext(notebookId: string): Promise<string | null> {
+  if (!isNeo4JAvailable()) {
+    return null;
+  }
+
+  try {
+    const [skillGraph, entities] = await Promise.all([
+      getSkillGraph(notebookId),
+      getEntitiesByNotebook(notebookId),
+    ]);
+
+    if (skillGraph.skills.length === 0 && entities.length === 0) {
+      return null;
+    }
+
+    const parts: string[] = [];
+
+    if (skillGraph.skills.length > 0) {
+      const skillList = skillGraph.skills
+        .map((s) => `- ${s.name}: ${s.description || ""}`)
+        .join("\n");
+      parts.push(`KEY CONCEPTS/SKILLS IDENTIFIED:\n${skillList}`);
+
+      // Include prerequisites as relationships
+      if (skillGraph.prerequisites.length > 0) {
+        const prereqList = skillGraph.prerequisites
+          .map((p) => {
+            const fromSkill = skillGraph.skills.find((s) => s.id === p.fromSkillId);
+            const toSkill = skillGraph.skills.find((s) => s.id === p.toSkillId);
+            if (fromSkill && toSkill) {
+              return `- "${fromSkill.name}" is a prerequisite for "${toSkill.name}"`;
+            }
+            return null;
+          })
+          .filter(Boolean)
+          .join("\n");
+        if (prereqList) {
+          parts.push(`\nCONCEPT RELATIONSHIPS:\n${prereqList}`);
+        }
+      }
+    }
+
+    if (entities.length > 0) {
+      const entityList = entities
+        .slice(0, 20) // Limit to top 20 entities
+        .map((e) => `- ${e.name} (${e.type})${e.description ? `: ${e.description}` : ""}`)
+        .join("\n");
+      parts.push(`\nKEY ENTITIES:\n${entityList}`);
+    }
+
+    return parts.join("\n\n");
+  } catch (error) {
+    console.error("[Mindmap] Error fetching graph context:", error);
+    return null;
+  }
+}
 
 function buildContentFromSources(sources: Source[], maxChars = 4000) {
   const payload = sources
@@ -34,10 +96,27 @@ export async function POST(request: NextRequest) {
 
     const ai = new GoogleGenAI({ apiKey });
     const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-    const content = buildContentFromSources(sources, 4000);
+    const sourceContent = buildContentFromSources(sources, 4000);
+
+    // Try to get graph context if available (enhances mindmap with extracted knowledge)
+    let graphContext: string | null = null;
+    if (notebookId) {
+      graphContext = await buildGraphContext(notebookId);
+      if (graphContext) {
+        console.log("[Mindmap] Including graph context with", graphContext.split("\n").length, "lines");
+      }
+    }
+
+    // Build final content with graph context if available
+    const content = graphContext
+      ? `${graphContext}\n\n---\n\nSOURCE CONTENT:\n${sourceContent}`
+      : sourceContent;
 
     // Use custom prompt if provided, otherwise use default
-    const systemPrompt = customPrompt || DEFAULT_PROMPTS.mindmap.defaultPrompt;
+    const basePrompt = customPrompt || DEFAULT_PROMPTS.mindmap.defaultPrompt;
+    const systemPrompt = graphContext
+      ? `${basePrompt}\n\nIMPORTANT: Use the KEY CONCEPTS/SKILLS and their RELATIONSHIPS to structure the mindmap hierarchically. The concept relationships indicate prerequisite knowledge flow.`
+      : basePrompt;
 
     const response = await ai.models.generateContent({
       model,
@@ -87,6 +166,7 @@ export async function POST(request: NextRequest) {
       notebookId,
       generatedAt: Date.now(),
       root: rootNode,
+      graphEnhanced: !!graphContext, // Indicates if knowledge graph data was used
     });
   } catch (error) {
     console.error("Mindmap generation error:", error);

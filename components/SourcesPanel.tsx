@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Link, FileUp, Plus, X, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Source } from "@/lib/types";
 
 interface SourcesPanelProps {
@@ -44,7 +43,7 @@ export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onA
   ).length;
 
   return (
-    <div className="flex flex-col h-full bg-white text-black p-4 gap-6">
+    <div className="flex flex-col h-full bg-white text-black p-4 gap-6 overflow-hidden max-w-full">
       <div>
         <h2 className="text-2xl font-bold mb-1">Sources</h2>
         <p className="text-sm text-gray-600">Add content to your notebook</p>
@@ -122,8 +121,8 @@ export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onA
         )}
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex items-center justify-between mb-3 gap-2">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Active Sources ({sources.length})</h3>
           {sources.filter(s => s.status === "success").length > 0 && (
             <Button
@@ -135,46 +134,44 @@ export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onA
             </Button>
           )}
         </div>
-        
-        <ScrollArea className="flex-1 -mx-4 px-4">
-          <div className="space-y-3">
+
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="space-y-3 pr-1">
             {sources.map((source) => (
-              <div key={source.id} className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-gray-300 transition-colors min-h-[100px]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-black mb-2 line-clamp-2 leading-relaxed">
-                        {source.title || source.url}
-                    </h4>
-                    <p className="text-xs text-gray-500 truncate">{source.url}</p>
-                  </div>
-                  <button 
-                    onClick={() => onRemoveSource(source.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-xs">
-                    {source.status === "success" ? (
-                        <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" /> Ready
-                        </span>
-                    ) : (
-                        <span className="text-yellow-600 flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Processing
-                        </span>
-                    )}
-                </div>
+              <div key={source.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <h4 className="text-sm font-medium text-black mb-1 truncate max-w-full block" title={source.title || source.url}>
+                    {source.title || source.url}
+                </h4>
+                <p className="text-xs text-gray-500 truncate max-w-full block mb-2" title={source.url}>{source.url}</p>
+                {source.status === "success" ? (
+                    <span className="text-green-600 flex items-center gap-1 text-xs mb-2">
+                        <CheckCircle className="h-3 w-3 flex-shrink-0" /> Ready
+                    </span>
+                ) : source.status === "error" ? (
+                    <span className="text-red-600 flex items-center gap-1 text-xs mb-2">
+                        <X className="h-3 w-3 flex-shrink-0" /> Error
+                    </span>
+                ) : (
+                    <span className="text-yellow-600 flex items-center gap-1 text-xs mb-2">
+                        <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" /> Processing
+                    </span>
+                )}
+                <button
+                  onClick={() => onRemoveSource(source.id)}
+                  className="w-full mt-1 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
+                >
+                  Delete Source
+                </button>
               </div>
             ))}
-            
+
             {sources.length === 0 && (
                 <div className="text-center text-gray-400 py-8 text-sm">
                     No sources added yet.
                 </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );
