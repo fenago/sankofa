@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { deleteNotebookGraph } from '@/lib/graph/store'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -114,7 +115,15 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Notebook not found' }, { status: 404 })
     }
 
-    // Delete will cascade to sources, chunks, and messages
+    // Delete Neo4J graph data for this notebook
+    try {
+      await deleteNotebookGraph(id)
+    } catch (graphError) {
+      console.error('Error deleting Neo4J graph data:', graphError)
+      // Continue with Supabase deletion even if Neo4J fails
+    }
+
+    // Delete will cascade to sources, chunks, and messages in Supabase
     const { error } = await supabase
       .from('notebooks')
       .delete()

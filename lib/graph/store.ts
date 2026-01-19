@@ -361,6 +361,193 @@ export async function deleteNotebookGraph(notebookId: string): Promise<void> {
       { notebookId }
     )
   })
+  console.log(`[Neo4J] Deleted all graph data for notebook: ${notebookId}`)
+}
+
+/**
+ * Delete all graph data for a specific source document
+ */
+export async function deleteSourceGraph(sourceDocumentId: string): Promise<void> {
+  await runWriteTransaction(async (tx) => {
+    // Delete all nodes that reference this source document
+    await tx.run(
+      `
+      MATCH (n {sourceDocumentId: $sourceDocumentId})
+      DETACH DELETE n
+      `,
+      { sourceDocumentId }
+    )
+  })
+  console.log(`[Neo4J] Deleted all graph data for source: ${sourceDocumentId}`)
+}
+
+/**
+ * Delete all graph data for multiple notebooks (user cleanup)
+ */
+export async function deleteNotebooksGraph(notebookIds: string[]): Promise<number> {
+  if (notebookIds.length === 0) return 0
+
+  let totalDeleted = 0
+  await runWriteTransaction(async (tx) => {
+    const result = await tx.run(
+      `
+      MATCH (n)
+      WHERE n.notebookId IN $notebookIds
+      WITH n, count(*) as nodeCount
+      DETACH DELETE n
+      RETURN count(*) as deleted
+      `,
+      { notebookIds }
+    )
+    totalDeleted = result.records[0]?.get('deleted')?.toNumber?.() || 0
+  })
+  console.log(`[Neo4J] Deleted graph data for ${notebookIds.length} notebooks (${totalDeleted} nodes)`)
+  return totalDeleted
+}
+
+/**
+ * Remove orphaned nodes (nodes without a valid notebookId)
+ */
+export async function cleanupOrphanedNodes(): Promise<{ skills: number; entities: number }> {
+  let skillsDeleted = 0
+  let entitiesDeleted = 0
+
+  await runWriteTransaction(async (tx) => {
+    // Delete orphaned skills (no notebookId or null notebookId)
+    const skillResult = await tx.run(
+      `
+      MATCH (s:Skill)
+      WHERE s.notebookId IS NULL OR s.notebookId = ''
+      WITH s, count(*) as cnt
+      DETACH DELETE s
+      RETURN count(*) as deleted
+      `
+    )
+    skillsDeleted = skillResult.records[0]?.get('deleted')?.toNumber?.() || 0
+
+    // Delete orphaned entities
+    const entityResult = await tx.run(
+      `
+      MATCH (e:Entity)
+      WHERE e.notebookId IS NULL OR e.notebookId = ''
+      WITH e, count(*) as cnt
+      DETACH DELETE e
+      RETURN count(*) as deleted
+      `
+    )
+    entitiesDeleted = entityResult.records[0]?.get('deleted')?.toNumber?.() || 0
+  })
+
+  console.log(`[Neo4J] Cleaned up orphaned nodes: ${skillsDeleted} skills, ${entitiesDeleted} entities`)
+  return { skills: skillsDeleted, entities: entitiesDeleted }
+}
+
+/**
+ * Get graph statistics for a notebook
+ */
+export async function getGraphStats(notebookId: string): Promise<{
+  skillCount: number
+  entityCount: number
+  prerequisiteCount: number
+  entityRelationshipCount: number
+}> {
+  const results = await runQuery<{
+    skillCount: number
+    entityCount: number
+    prerequisiteCount: number
+    entityRelationshipCount: number
+  }>(
+    `
+    MATCH (s:Skill {notebookId: $notebookId})
+    WITH count(s) as skillCount
+    MATCH (e:Entity {notebookId: $notebookId})
+    WITH skillCount, count(e) as entityCount
+    OPTIONAL MATCH (s1:Skill {notebookId: $notebookId})-[p:PREREQUISITE_OF]->(s2:Skill {notebookId: $notebookId})
+    WITH skillCount, entityCount, count(p) as prerequisiteCount
+    OPTIONAL MATCH (e1:Entity {notebookId: $notebookId})-[r:RELATES_TO]->(e2:Entity {notebookId: $notebookId})
+    RETURN skillCount, entityCount, prerequisiteCount, count(r) as entityRelationshipCount
+    `,
+    { notebookId }
+  )
+
+  if (results.length === 0) {
+    return { skillCount: 0, entityCount: 0, prerequisiteCount: 0, entityRelationshipCount: 0 }
+  }
+
+  const row = results[0]
+  return {
+    skillCount: typeof row.skillCount === 'object' && 'toNumber' in row.skillCount
+      ? (row.skillCount as { toNumber: () => number }).toNumber()
+      : Number(row.skillCount) || 0,
+    entityCount: typeof row.entityCount === 'object' && 'toNumber' in row.entityCount
+      ? (row.entityCount as { toNumber: () => number }).toNumber()
+      : Number(row.entityCount) || 0,
+    prerequisiteCount: typeof row.prerequisiteCount === 'object' && 'toNumber' in row.prerequisiteCount
+      ? (row.prerequisiteCount as { toNumber: () => number }).toNumber()
+      : Number(row.prerequisiteCount) || 0,
+    entityRelationshipCount: typeof row.entityRelationshipCount === 'object' && 'toNumber' in row.entityRelationshipCount
+      ? (row.entityRelationshipCount as { toNumber: () => number }).toNumber()
+      : Number(row.entityRelationshipCount) || 0,
+  }
+}
+
+/**
+ * Get all graph statistics (admin use)
+ */
+export async function getAllGraphStats(): Promise<{
+  totalSkills: number
+  totalEntities: number
+  totalPrerequisites: number
+  totalEntityRelationships: number
+  orphanedSkills: number
+  orphanedEntities: number
+}> {
+  const results = await runQuery<{
+    totalSkills: number
+    totalEntities: number
+    totalPrerequisites: number
+    totalEntityRelationships: number
+    orphanedSkills: number
+    orphanedEntities: number
+  }>(
+    `
+    MATCH (s:Skill) WITH count(s) as totalSkills
+    MATCH (e:Entity) WITH totalSkills, count(e) as totalEntities
+    OPTIONAL MATCH ()-[p:PREREQUISITE_OF]->() WITH totalSkills, totalEntities, count(p) as totalPrerequisites
+    OPTIONAL MATCH ()-[r:RELATES_TO]->() WITH totalSkills, totalEntities, totalPrerequisites, count(r) as totalEntityRelationships
+    OPTIONAL MATCH (os:Skill) WHERE os.notebookId IS NULL OR os.notebookId = '' WITH totalSkills, totalEntities, totalPrerequisites, totalEntityRelationships, count(os) as orphanedSkills
+    OPTIONAL MATCH (oe:Entity) WHERE oe.notebookId IS NULL OR oe.notebookId = ''
+    RETURN totalSkills, totalEntities, totalPrerequisites, totalEntityRelationships, orphanedSkills, count(oe) as orphanedEntities
+    `
+  )
+
+  if (results.length === 0) {
+    return {
+      totalSkills: 0,
+      totalEntities: 0,
+      totalPrerequisites: 0,
+      totalEntityRelationships: 0,
+      orphanedSkills: 0,
+      orphanedEntities: 0,
+    }
+  }
+
+  const row = results[0]
+  const toNum = (val: unknown): number => {
+    if (typeof val === 'object' && val !== null && 'toNumber' in val) {
+      return (val as { toNumber: () => number }).toNumber()
+    }
+    return Number(val) || 0
+  }
+
+  return {
+    totalSkills: toNum(row.totalSkills),
+    totalEntities: toNum(row.totalEntities),
+    totalPrerequisites: toNum(row.totalPrerequisites),
+    totalEntityRelationships: toNum(row.totalEntityRelationships),
+    orphanedSkills: toNum(row.orphanedSkills),
+    orphanedEntities: toNum(row.orphanedEntities),
+  }
 }
 
 /**

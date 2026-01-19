@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { deleteSourceGraph } from '@/lib/graph/store'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -38,6 +39,14 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     if (!source) {
       return NextResponse.json({ error: 'Source not found' }, { status: 404 })
+    }
+
+    // Delete Neo4J graph data for this source
+    try {
+      await deleteSourceGraph(sourceId)
+    } catch (graphError) {
+      console.error('Error deleting Neo4J graph data for source:', graphError)
+      // Continue with Supabase deletion even if Neo4J fails
     }
 
     // Delete source (chunks will cascade delete due to foreign key)
