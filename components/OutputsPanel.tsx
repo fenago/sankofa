@@ -2,13 +2,20 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { Play, Pause, FileText, Share2, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network } from "lucide-react";
+import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MindMap } from "./MindMap";
 import { VisualizerSection } from "./VisualizerSection";
 import { VideoStudio } from "./VideoStudio";
 import { Source } from "@/lib/types";
+
+type ExpandedSection = "audio" | "mindmap" | "summary" | "slides" | "visualizer" | "video" | "graph" | null;
 
 // Dynamically import KnowledgeGraphPanel with SSR disabled (React Flow doesn't support SSR)
 const KnowledgeGraphPanel = dynamic(
@@ -119,7 +126,20 @@ export function OutputsPanel({
   onGenerateSummary,
 }: OutputsPanelProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<ExpandedSection>(null);
   const audioRef = React.useRef<HTMLAudioElement>(null);
+
+  const ExpandButton = ({ section, title }: { section: ExpandedSection; title: string }) => (
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={() => setExpandedSection(section)}
+      className="text-xs h-8 text-gray-500 hover:text-black hover:bg-gray-100"
+      title={`Expand ${title}`}
+    >
+      <Maximize2 className="h-4 w-4" />
+    </Button>
+  );
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -217,17 +237,20 @@ export function OutputsPanel({
       <section className="bg-gray-50 rounded-xl p-4 border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-black">Audio Overview</h3>
-          {!audioUrl && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={onGenerateAudio}
-              disabled={isGeneratingAudio}
-              className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
-            >
-              {isGeneratingAudio ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate"}
-            </Button>
-          )}
+          <div className="flex gap-1">
+            {audioUrl && <ExpandButton section="audio" title="Audio Overview" />}
+            {!audioUrl && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onGenerateAudio}
+                disabled={isGeneratingAudio}
+                className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
+              >
+                {isGeneratingAudio ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate"}
+              </Button>
+            )}
+          </div>
         </div>
         
         {audioUrl ? (
@@ -281,7 +304,8 @@ export function OutputsPanel({
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
+              {mindmapData && <ExpandButton section="mindmap" title="Mindmap" />}
               {mindmapData && (
                 <Button
                   size="sm"
@@ -313,7 +337,8 @@ export function OutputsPanel({
       <section className="bg-gray-50 rounded-xl p-4 border border-gray-200">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold text-black">Research Summary</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
+            {summary && <ExpandButton section="summary" title="Research Summary" />}
             {summary && (
               <Button
                 size="sm"
@@ -343,7 +368,8 @@ export function OutputsPanel({
       <section className="bg-gray-50 rounded-xl p-4 border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-black">Presentation Slides</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
+            {slides.length > 0 && <ExpandButton section="slides" title="Presentation Slides" />}
             {slides.length > 0 && (
               <Button
                 size="sm"
@@ -355,9 +381,9 @@ export function OutputsPanel({
                 <Download className="h-4 w-4" />
               </Button>
             )}
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               onClick={onGenerateSlides}
               disabled={isGeneratingSlides}
               className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
@@ -388,21 +414,138 @@ export function OutputsPanel({
       </section>
 
       {/* Concept Visualizer */}
-      <section className="bg-gray-50 rounded-xl border border-gray-200">
+      <section className="bg-gray-50 rounded-xl border border-gray-200 relative">
+        <div className="absolute top-4 right-4 z-10">
+          <ExpandButton section="visualizer" title="Concept Visualizer" />
+        </div>
         <VisualizerSection sources={sources} />
       </section>
 
       {/* Video Studio */}
-      <section className="bg-gray-50 rounded-xl border border-gray-200">
+      <section className="bg-gray-50 rounded-xl border border-gray-200 relative">
+        <div className="absolute top-4 right-4 z-10">
+          <ExpandButton section="video" title="Video Studio" />
+        </div>
         <VideoStudio sources={sources} />
       </section>
 
       {/* Knowledge Graph - only shown when in a notebook context */}
       {notebookId && (
-        <section className="bg-gray-50 rounded-xl border border-gray-200">
+        <section className="bg-gray-50 rounded-xl border border-gray-200 relative">
+          <div className="absolute top-4 right-4 z-10">
+            <ExpandButton section="graph" title="Knowledge Graph" />
+          </div>
           <KnowledgeGraphPanel notebookId={notebookId} />
         </section>
       )}
+
+      {/* Fullscreen Dialog */}
+      <Dialog open={expandedSection !== null} onOpenChange={(open) => !open && setExpandedSection(null)}>
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0 flex flex-row items-center justify-between">
+            <DialogTitle className="text-xl font-semibold">
+              {expandedSection === "audio" && "Audio Overview"}
+              {expandedSection === "mindmap" && "Mindmap Preview"}
+              {expandedSection === "summary" && "Research Summary"}
+              {expandedSection === "slides" && "Presentation Slides"}
+              {expandedSection === "visualizer" && "Concept Visualizer"}
+              {expandedSection === "video" && "Video Studio"}
+              {expandedSection === "graph" && "Knowledge Graph"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-4 pt-2">
+            {/* Audio Overview - Expanded */}
+            {expandedSection === "audio" && audioUrl && (
+              <div className="h-full flex items-center justify-center">
+                <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full p-4 pr-8 shadow-sm w-full max-w-2xl">
+                  <Button
+                    size="icon"
+                    className="h-16 w-16 rounded-full bg-black text-white hover:bg-gray-800 hover:text-white shrink-0"
+                    onClick={togglePlay}
+                  >
+                    {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8 ml-1" />}
+                  </Button>
+                  <div className="flex-1 flex items-center justify-center gap-1 h-16 overflow-hidden">
+                    {Array.from({ length: 60 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 bg-black/80 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]"
+                        style={{
+                          height: `${Math.max(15, Math.random() * 80)}%`,
+                          animationDelay: `${i * 0.05}s`,
+                          opacity: isPlaying ? 1 : 0.3,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <audio
+                    ref={audioRef}
+                    src={audioUrl}
+                    onEnded={() => setIsPlaying(false)}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Mindmap - Expanded */}
+            {expandedSection === "mindmap" && (
+              <div className="h-[calc(95vh-100px)] w-full">
+                <MindMap data={mindmapData} />
+              </div>
+            )}
+
+            {/* Research Summary - Expanded */}
+            {expandedSection === "summary" && (
+              <div className="max-w-4xl mx-auto">
+                <FormattedSummary text={summary || ""} />
+              </div>
+            )}
+
+            {/* Slides - Expanded */}
+            {expandedSection === "slides" && (
+              <div className="grid grid-cols-3 gap-4 max-w-6xl mx-auto">
+                {slides.map((slide, i) => (
+                  <div
+                    key={i}
+                    className="aspect-video bg-white rounded-lg border border-gray-200 p-4 overflow-hidden shadow-sm"
+                  >
+                    <h4 className="text-sm font-bold text-black truncate mb-2">{slide.title}</h4>
+                    <ul className="space-y-1">
+                      {slide.bullets.map((b: string, j: number) => (
+                        <li key={j} className="text-xs text-gray-600 truncate">
+                          • {b}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Concept Visualizer - Expanded */}
+            {expandedSection === "visualizer" && (
+              <div className="h-[calc(95vh-100px)]">
+                <VisualizerSection sources={sources} expanded />
+              </div>
+            )}
+
+            {/* Video Studio - Expanded */}
+            {expandedSection === "video" && (
+              <div className="h-[calc(95vh-100px)]">
+                <VideoStudio sources={sources} expanded />
+              </div>
+            )}
+
+            {/* Knowledge Graph - Expanded */}
+            {expandedSection === "graph" && notebookId && (
+              <div className="h-[calc(95vh-100px)]">
+                <KnowledgeGraphPanel notebookId={notebookId} expanded />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

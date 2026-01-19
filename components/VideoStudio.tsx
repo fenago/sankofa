@@ -9,6 +9,7 @@ import { Video, Loader2, Download, X, RotateCcw } from "lucide-react";
 
 interface VideoStudioProps {
   sources: Source[];
+  expanded?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -17,7 +18,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function VideoStudio({ sources }: VideoStudioProps) {
+export function VideoStudio({ sources, expanded }: VideoStudioProps) {
   const [prompt, setPrompt] = useState("");
   const [useSources, setUseSources] = useState(false);
 
@@ -58,7 +59,7 @@ export function VideoStudio({ sources }: VideoStudioProps) {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className={`p-4 space-y-4 ${expanded ? "h-full flex flex-col" : ""}`}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-gray-900">Video Studio</h3>
       </div>
@@ -153,14 +154,14 @@ export function VideoStudio({ sources }: VideoStudioProps) {
 
       {/* Complete State */}
       {status === "complete" && videoUrl && (
-        <div className="space-y-3">
-          <div className="border border-gray-200 rounded-lg overflow-hidden bg-black">
+        <div className={`space-y-3 ${expanded ? "flex-1 flex flex-col" : ""}`}>
+          <div className={`border border-gray-200 rounded-lg overflow-hidden bg-black ${expanded ? "flex-1" : ""}`}>
             <video
               src={videoUrl}
               controls
               autoPlay
               loop
-              className="w-full aspect-video"
+              className={`w-full ${expanded ? "h-full object-contain" : "aspect-video"}`}
             />
           </div>
 

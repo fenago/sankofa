@@ -47,6 +47,7 @@ interface GraphData {
 
 interface KnowledgeGraphPanelProps {
   notebookId: string;
+  expanded?: boolean;
 }
 
 // Colors for Bloom levels
@@ -69,7 +70,7 @@ const entityTypeColors: Record<string, string> = {
   other: "bg-gray-100 text-gray-800",
 };
 
-export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
+export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPanelProps) {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,7 +234,7 @@ export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
   }
 
   return (
-    <div className="p-4">
+    <div className={`p-4 ${expanded ? "h-full flex flex-col" : ""}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-black flex items-center gap-2">
           <Network className="h-5 w-5" />
@@ -285,7 +286,7 @@ export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
           <p className="text-xs text-gray-400 mt-1">Click &quot;Extract&quot; to analyze your sources</p>
         </div>
       ) : (
-        <div>
+        <div className={expanded ? "flex-1 flex flex-col" : ""}>
           {/* Tab buttons */}
           <div className="flex border-b border-gray-200 mb-4">
             <button
@@ -325,8 +326,8 @@ export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
 
           {/* Graph View */}
           {activeTab === "graph" && (
-            <>
-              <div className="h-[350px] bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+            <div className={expanded ? "flex-1 flex flex-col" : ""}>
+              <div className={`bg-gray-50 rounded-lg border border-gray-200 overflow-hidden ${expanded ? "flex-1" : "h-[350px]"}`}>
                 {nodes.length > 0 ? (
                   <ReactFlow
                     nodes={nodes}
@@ -358,12 +359,12 @@ export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
                   <span className="w-3 h-0.5 bg-gray-400"></span> Helpful
                 </span>
               </div>
-            </>
+            </div>
           )}
 
           {/* Skills List */}
           {activeTab === "skills" && (
-            <div className="max-h-[380px] overflow-y-auto space-y-2">
+            <div className={`overflow-y-auto space-y-2 ${expanded ? "flex-1" : "max-h-[380px]"}`}>
               {graphData?.skills.map((skill) => (
                 <div
                   key={skill.id}
@@ -408,7 +409,7 @@ export function KnowledgeGraphPanel({ notebookId }: KnowledgeGraphPanelProps) {
 
           {/* Entities List */}
           {activeTab === "entities" && (
-            <div className="max-h-[380px] overflow-y-auto space-y-2">
+            <div className={`overflow-y-auto space-y-2 ${expanded ? "flex-1" : "max-h-[380px]"}`}>
               {graphData?.entities.map((entity) => (
                 <div
                   key={entity.id}

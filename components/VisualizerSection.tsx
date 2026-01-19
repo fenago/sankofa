@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 interface VisualizerSectionProps {
   sources: Source[];
   onVisualizationGenerated?: (viz: ConceptVisualization) => void;
+  expanded?: boolean;
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
@@ -39,7 +40,7 @@ const MODEL_TIERS: { value: ModelTier; label: string; description: string }[] = 
   { value: "standard", label: "Standard", description: "Faster, good quality" },
 ];
 
-export function VisualizerSection({ sources, onVisualizationGenerated }: VisualizerSectionProps) {
+export function VisualizerSection({ sources, onVisualizationGenerated, expanded }: VisualizerSectionProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<VisualizationMode>("mermaid");
   const [diagramType, setDiagramType] = useState<DiagramType>("flowchart");
@@ -142,7 +143,7 @@ export function VisualizerSection({ sources, onVisualizationGenerated }: Visuali
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className={`p-4 space-y-4 ${expanded ? "h-full flex flex-col" : ""}`}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-gray-900">Concept Visualizer</h3>
       </div>
@@ -257,7 +258,7 @@ export function VisualizerSection({ sources, onVisualizationGenerated }: Visuali
 
       {/* Visualization Display */}
       {visualization && (
-        <div className="space-y-2">
+        <div className={`space-y-2 ${expanded ? "flex-1 flex flex-col" : ""}`}>
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-gray-700">{visualization.title}</h4>
             <Button
@@ -271,9 +272,9 @@ export function VisualizerSection({ sources, onVisualizationGenerated }: Visuali
             </Button>
           </div>
 
-          <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <div className={`border border-gray-200 rounded-lg overflow-hidden bg-white ${expanded ? "flex-1" : ""}`}>
             {visualization.mode === "mermaid" && visualization.mermaidSyntax ? (
-              <div className="p-4 min-h-[200px] flex flex-col items-center justify-center">
+              <div className={`p-4 flex flex-col items-center justify-center ${expanded ? "h-full" : "min-h-[200px]"}`}>
                 <MermaidDiagram
                   syntax={visualization.mermaidSyntax}
                   className="max-w-full"
