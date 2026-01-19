@@ -55,7 +55,18 @@ For each skill, determine:
 - Whether it's a "threshold concept" (transformative, troublesome knowledge that unlocks new understanding)
 - Estimated time to learn (in minutes)
 - Difficulty (1-10)
-- Cognitive load (low/medium/high)
+- IRT parameters (Item Response Theory 3PL model):
+  - difficulty: -3 to +3 (0 = average, positive = harder)
+  - discrimination: 0.5 to 2.5 (how well it differentiates learner ability)
+  - guessing: 0 to 0.5 (probability of guessing correctly, lower for open-ended)
+- Cognitive load (low/medium/high) and element interactivity
+- Working memory chunks required (2-7, based on Miller's Law)
+- Mastery threshold (0.80 for regular skills, 0.90 for threshold concepts)
+- Common misconceptions students might have
+- Transfer domains (where else this skill applies)
+- Suggested assessments aligned with Bloom's level
+- Spaced repetition review intervals (in days)
+- Scaffolding levels (worked examples → hints → independent practice)
 ${existingContext}
 
 TEXT TO ANALYZE:
@@ -71,12 +82,37 @@ Respond with valid JSON matching this structure:
       "secondaryBloomLevels": [optional array of 1-6],
       "estimatedMinutes": number,
       "difficulty": 1-10,
+      "irt": {
+        "difficulty": -3 to +3,
+        "discrimination": 0.5 to 2.5,
+        "guessing": 0 to 0.5
+      },
       "isThresholdConcept": boolean,
       "thresholdProperties": {
         "unlocksDomains": ["optional array of domains this unlocks"],
         "troublesomeAspects": ["what makes this concept difficult"]
       },
       "cognitiveLoadEstimate": "low" | "medium" | "high",
+      "elementInteractivity": "low" | "medium" | "high",
+      "chunksRequired": 2-7,
+      "masteryThreshold": 0.80 or 0.90,
+      "commonMisconceptions": ["misconception 1", "misconception 2"],
+      "transferDomains": ["domain where skill transfers"],
+      "assessmentTypes": ["formative", "summative", "performance", "diagnostic", "peer"],
+      "suggestedAssessments": [
+        {
+          "type": "formative" | "summative" | "performance" | "diagnostic" | "peer",
+          "description": "specific assessment activity",
+          "bloomAlignment": [1-6]
+        }
+      ],
+      "reviewIntervals": [1, 3, 7, 14, 30, 60],
+      "scaffoldingLevels": {
+        "level1": "Full worked example description",
+        "level2": "Partial solution description",
+        "level3": "Hints on request description",
+        "level4": "Independent practice description"
+      },
       "keywords": ["relevant keywords"],
       "domain": "optional domain classification",
       "subdomain": "optional subdomain"
@@ -149,9 +185,29 @@ Only extract skills and entities that are clearly present in the text. Be conser
     secondaryBloomLevels: s.secondaryBloomLevels?.map(validateBloomLevel),
     estimatedMinutes: s.estimatedMinutes,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
+    // IRT 3PL model parameters
+    irt: s.irt ? {
+      difficulty: Math.min(3, Math.max(-3, s.irt.difficulty || 0)),
+      discrimination: Math.min(2.5, Math.max(0.5, s.irt.discrimination || 1)),
+      guessing: Math.min(0.5, Math.max(0, s.irt.guessing || 0.2)),
+    } : undefined,
     isThresholdConcept: s.isThresholdConcept || false,
     thresholdProperties: s.thresholdProperties,
     cognitiveLoadEstimate: s.cognitiveLoadEstimate || 'medium',
+    // New educational psychology properties
+    elementInteractivity: s.elementInteractivity,
+    chunksRequired: s.chunksRequired ? Math.min(7, Math.max(2, s.chunksRequired)) : undefined,
+    masteryThreshold: s.masteryThreshold || (s.isThresholdConcept ? 0.90 : 0.80),
+    commonMisconceptions: s.commonMisconceptions,
+    transferDomains: s.transferDomains,
+    assessmentTypes: s.assessmentTypes,
+    suggestedAssessments: s.suggestedAssessments?.map(a => ({
+      type: a.type,
+      description: a.description,
+      bloomAlignment: a.bloomAlignment.map(validateBloomLevel),
+    })),
+    reviewIntervals: s.reviewIntervals || [1, 3, 7, 14, 30, 60],
+    scaffoldingLevels: s.scaffoldingLevels,
     keywords: s.keywords || [],
     domain: s.domain,
     subdomain: s.subdomain,
@@ -367,12 +423,35 @@ interface RawSkill {
   secondaryBloomLevels?: number[]
   estimatedMinutes?: number
   difficulty?: number
+  irt?: {
+    difficulty: number
+    discrimination: number
+    guessing: number
+  }
   isThresholdConcept?: boolean
   thresholdProperties?: {
     unlocksDomains?: string[]
     troublesomeAspects?: string[]
   }
   cognitiveLoadEstimate?: 'low' | 'medium' | 'high'
+  elementInteractivity?: 'low' | 'medium' | 'high'
+  chunksRequired?: number
+  masteryThreshold?: number
+  commonMisconceptions?: string[]
+  transferDomains?: string[]
+  assessmentTypes?: ('formative' | 'summative' | 'performance' | 'diagnostic' | 'peer')[]
+  suggestedAssessments?: {
+    type: 'formative' | 'summative' | 'performance' | 'diagnostic' | 'peer'
+    description: string
+    bloomAlignment: number[]
+  }[]
+  reviewIntervals?: number[]
+  scaffoldingLevels?: {
+    level1: string
+    level2: string
+    level3: string
+    level4: string
+  }
   keywords?: string[]
   domain?: string
   subdomain?: string

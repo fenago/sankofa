@@ -44,8 +44,20 @@ export async function storeSkills(skills: SkillNode[]): Promise<void> {
             s.secondaryBloomLevels = $secondaryBloomLevels,
             s.estimatedMinutes = $estimatedMinutes,
             s.difficulty = $difficulty,
+            s.irtDifficulty = $irtDifficulty,
+            s.irtDiscrimination = $irtDiscrimination,
+            s.irtGuessing = $irtGuessing,
             s.isThresholdConcept = $isThresholdConcept,
             s.cognitiveLoadEstimate = $cognitiveLoadEstimate,
+            s.elementInteractivity = $elementInteractivity,
+            s.chunksRequired = $chunksRequired,
+            s.masteryThreshold = $masteryThreshold,
+            s.commonMisconceptions = $commonMisconceptions,
+            s.transferDomains = $transferDomains,
+            s.assessmentTypes = $assessmentTypes,
+            s.suggestedAssessments = $suggestedAssessments,
+            s.reviewIntervals = $reviewIntervals,
+            s.scaffoldingLevels = $scaffoldingLevels,
             s.keywords = $keywords,
             s.domain = $domain,
             s.subdomain = $subdomain,
@@ -62,8 +74,23 @@ export async function storeSkills(skills: SkillNode[]): Promise<void> {
           secondaryBloomLevels: skill.secondaryBloomLevels || [],
           estimatedMinutes: skill.estimatedMinutes || null,
           difficulty: skill.difficulty || null,
+          // IRT 3PL parameters
+          irtDifficulty: skill.irt?.difficulty ?? null,
+          irtDiscrimination: skill.irt?.discrimination ?? null,
+          irtGuessing: skill.irt?.guessing ?? null,
           isThresholdConcept: skill.isThresholdConcept,
           cognitiveLoadEstimate: skill.cognitiveLoadEstimate || null,
+          // New educational psychology properties
+          elementInteractivity: skill.elementInteractivity || null,
+          chunksRequired: skill.chunksRequired || null,
+          masteryThreshold: skill.masteryThreshold || 0.80,
+          commonMisconceptions: skill.commonMisconceptions || [],
+          transferDomains: skill.transferDomains || [],
+          assessmentTypes: skill.assessmentTypes || [],
+          // Store complex objects as JSON strings
+          suggestedAssessments: skill.suggestedAssessments ? JSON.stringify(skill.suggestedAssessments) : null,
+          reviewIntervals: skill.reviewIntervals || [1, 3, 7, 14, 30, 60],
+          scaffoldingLevels: skill.scaffoldingLevels ? JSON.stringify(skill.scaffoldingLevels) : null,
           keywords: skill.keywords,
           domain: skill.domain || null,
           subdomain: skill.subdomain || null,
@@ -356,4 +383,294 @@ export async function searchSkills(
   )
 
   return result.map(r => extractProperties(r.s))
+}
+
+/**
+ * Get skills with no prerequisites (root skills / entry points)
+ */
+export async function getRootSkills(notebookId: string): Promise<SkillNode[]> {
+  const result = await runQuery<{ s: Neo4JNode<SkillNode> | SkillNode }>(
+    `
+    MATCH (s:Skill {notebookId: $notebookId})
+    WHERE NOT ()-[:PREREQUISITE_OF]->(s)
+    RETURN s
+    ORDER BY s.bloomLevel ASC, s.difficulty ASC
+    `,
+    { notebookId }
+  )
+
+  return result.map(r => extractProperties(r.s))
+}
+
+/**
+ * Get all prerequisite relationships for a notebook
+ */
+export async function getAllPrerequisites(notebookId: string): Promise<PrerequisiteRelationship[]> {
+  const result = await runQuery<{
+    fromId: string
+    toId: string
+    strength: 'required' | 'recommended' | 'helpful'
+    confidenceScore: number
+    reasoning?: string
+    inferenceMethod?: string
+  }>(
+    `
+    MATCH (from:Skill {notebookId: $notebookId})-[r:PREREQUISITE_OF]->(to:Skill {notebookId: $notebookId})
+    RETURN from.id as fromId, to.id as toId, r.strength as strength,
+           r.confidenceScore as confidenceScore, r.reasoning as reasoning,
+           r.inferenceMethod as inferenceMethod
+    `,
+    { notebookId }
+  )
+
+  return result.map(r => ({
+    fromSkillId: r.fromId,
+    toSkillId: r.toId,
+    strength: r.strength,
+    confidenceScore: r.confidenceScore,
+    reasoning: r.reasoning,
+    inferenceMethod: r.inferenceMethod as PrerequisiteRelationship['inferenceMethod'],
+  }))
+}
+
+/**
+ * Generate a topologically sorted learning path from start to goal skill
+ * Uses Kahn's algorithm for topological sort
+ */
+export async function generateLearningPath(
+  notebookId: string,
+  goalSkillId: string,
+  masteredSkillIds: string[] = []
+): Promise<{
+  path: SkillNode[]
+  totalEstimatedMinutes: number
+  thresholdConcepts: SkillNode[]
+}> {
+  // First, get all skills that are prerequisites (direct or transitive) of the goal
+  const result = await runQuery<{ s: Neo4JNode<SkillNode> | SkillNode; depth: number }>(
+    `
+    MATCH path = (prereq:Skill)-[:PREREQUISITE_OF*0..]->(goal:Skill {id: $goalSkillId})
+    WHERE prereq.notebookId = $notebookId
+    WITH prereq, length(path) as depth
+    RETURN DISTINCT prereq as s, depth
+    ORDER BY depth DESC
+    `,
+    { notebookId, goalSkillId }
+  )
+
+  const allSkills = result.map(r => extractProperties(r.s))
+  const masteredSet = new Set(masteredSkillIds)
+
+  // Filter out already mastered skills
+  const remainingSkills = allSkills.filter(s => !masteredSet.has(s.id))
+
+  // Get prerequisites among remaining skills
+  const prereqs = await getAllPrerequisites(notebookId)
+  const relevantSkillIds = new Set(remainingSkills.map(s => s.id))
+  const relevantPrereqs = prereqs.filter(
+    p => relevantSkillIds.has(p.fromSkillId) && relevantSkillIds.has(p.toSkillId)
+  )
+
+  // Build adjacency list and in-degree map for topological sort
+  const inDegree = new Map<string, number>()
+  const adjacency = new Map<string, string[]>()
+
+  for (const skill of remainingSkills) {
+    inDegree.set(skill.id, 0)
+    adjacency.set(skill.id, [])
+  }
+
+  for (const prereq of relevantPrereqs) {
+    const current = inDegree.get(prereq.toSkillId) || 0
+    inDegree.set(prereq.toSkillId, current + 1)
+    const adj = adjacency.get(prereq.fromSkillId) || []
+    adj.push(prereq.toSkillId)
+    adjacency.set(prereq.fromSkillId, adj)
+  }
+
+  // Kahn's algorithm
+  const queue: string[] = []
+  for (const [skillId, degree] of inDegree) {
+    if (degree === 0) {
+      queue.push(skillId)
+    }
+  }
+
+  const sortedIds: string[] = []
+  while (queue.length > 0) {
+    // Sort queue by Bloom level and difficulty for consistent ordering
+    queue.sort((a, b) => {
+      const skillA = remainingSkills.find(s => s.id === a)!
+      const skillB = remainingSkills.find(s => s.id === b)!
+      if (skillA.bloomLevel !== skillB.bloomLevel) {
+        return skillA.bloomLevel - skillB.bloomLevel
+      }
+      return (skillA.difficulty || 5) - (skillB.difficulty || 5)
+    })
+
+    const current = queue.shift()!
+    sortedIds.push(current)
+
+    for (const neighbor of adjacency.get(current) || []) {
+      const newDegree = (inDegree.get(neighbor) || 1) - 1
+      inDegree.set(neighbor, newDegree)
+      if (newDegree === 0) {
+        queue.push(neighbor)
+      }
+    }
+  }
+
+  // Build final path
+  const skillMap = new Map(remainingSkills.map(s => [s.id, s]))
+  const path = sortedIds.map(id => skillMap.get(id)!).filter(Boolean)
+
+  // Calculate totals
+  const totalEstimatedMinutes = path.reduce((sum, s) => sum + (s.estimatedMinutes || 30), 0)
+  const thresholdConcepts = path.filter(s => s.isThresholdConcept)
+
+  return {
+    path,
+    totalEstimatedMinutes,
+    thresholdConcepts,
+  }
+}
+
+/**
+ * Get Zone of Proximal Development skills
+ * These are skills where all required prerequisites are mastered
+ */
+export async function getZPDSkills(
+  notebookId: string,
+  masteredSkillIds: string[]
+): Promise<{
+  skill: SkillNode
+  readinessScore: number
+  prerequisitesMastered: string[]
+  prerequisitesPending: string[]
+}[]> {
+  const masteredSet = new Set(masteredSkillIds)
+
+  // Get all skills and their prerequisites
+  const { skills, prerequisites } = await getSkillGraph(notebookId)
+
+  // Build prerequisite map
+  const prereqMap = new Map<string, PrerequisiteRelationship[]>()
+  for (const prereq of prerequisites) {
+    const existing = prereqMap.get(prereq.toSkillId) || []
+    existing.push(prereq)
+    prereqMap.set(prereq.toSkillId, existing)
+  }
+
+  const zpdSkills: {
+    skill: SkillNode
+    readinessScore: number
+    prerequisitesMastered: string[]
+    prerequisitesPending: string[]
+  }[] = []
+
+  for (const skill of skills) {
+    // Skip already mastered skills
+    if (masteredSet.has(skill.id)) continue
+
+    const prereqs = prereqMap.get(skill.id) || []
+    const requiredPrereqs = prereqs.filter(p => p.strength === 'required')
+    const recommendedPrereqs = prereqs.filter(p => p.strength === 'recommended')
+    const helpfulPrereqs = prereqs.filter(p => p.strength === 'helpful')
+
+    // Calculate mastery status
+    const masteredRequired = requiredPrereqs.filter(p => masteredSet.has(p.fromSkillId))
+    const masteredRecommended = recommendedPrereqs.filter(p => masteredSet.has(p.fromSkillId))
+    const masteredHelpful = helpfulPrereqs.filter(p => masteredSet.has(p.fromSkillId))
+
+    // A skill is in ZPD if all required prerequisites are met
+    const allRequiredMet = masteredRequired.length === requiredPrereqs.length
+
+    if (allRequiredMet || prereqs.length === 0) {
+      // Calculate readiness score
+      const requiredScore = requiredPrereqs.length === 0 ? 1 : masteredRequired.length / requiredPrereqs.length
+      const recommendedScore = recommendedPrereqs.length === 0 ? 1 : masteredRecommended.length / recommendedPrereqs.length
+      const helpfulScore = helpfulPrereqs.length === 0 ? 1 : masteredHelpful.length / helpfulPrereqs.length
+
+      // Weighted average: required (60%), recommended (30%), helpful (10%)
+      const readinessScore = requiredScore * 0.6 + recommendedScore * 0.3 + helpfulScore * 0.1
+
+      const prerequisitesMastered = prereqs
+        .filter(p => masteredSet.has(p.fromSkillId))
+        .map(p => p.fromSkillId)
+      const prerequisitesPending = prereqs
+        .filter(p => !masteredSet.has(p.fromSkillId))
+        .map(p => p.fromSkillId)
+
+      zpdSkills.push({
+        skill,
+        readinessScore,
+        prerequisitesMastered,
+        prerequisitesPending,
+      })
+    }
+  }
+
+  // Sort by readiness score descending, then by Bloom level ascending
+  zpdSkills.sort((a, b) => {
+    if (Math.abs(a.readinessScore - b.readinessScore) > 0.1) {
+      return b.readinessScore - a.readinessScore
+    }
+    return a.skill.bloomLevel - b.skill.bloomLevel
+  })
+
+  return zpdSkills
+}
+
+/**
+ * Get curriculum overview with learning stages
+ */
+export async function getCurriculumOverview(notebookId: string): Promise<{
+  stages: {
+    bloomLevel: number
+    bloomLabel: string
+    skills: SkillNode[]
+    totalMinutes: number
+    thresholdCount: number
+  }[]
+  totalSkills: number
+  totalMinutes: number
+  totalThresholdConcepts: number
+}> {
+  const skills = await getSkillsByNotebook(notebookId)
+
+  const bloomLabels: Record<number, string> = {
+    1: 'Remember',
+    2: 'Understand',
+    3: 'Apply',
+    4: 'Analyze',
+    5: 'Evaluate',
+    6: 'Create',
+  }
+
+  // Group by Bloom level
+  const byBloom = new Map<number, SkillNode[]>()
+  for (let i = 1; i <= 6; i++) {
+    byBloom.set(i, [])
+  }
+  for (const skill of skills) {
+    const level = skill.bloomLevel || 1
+    const existing = byBloom.get(level) || []
+    existing.push(skill)
+    byBloom.set(level, existing)
+  }
+
+  const stages = Array.from(byBloom.entries()).map(([level, levelSkills]) => ({
+    bloomLevel: level,
+    bloomLabel: bloomLabels[level] || 'Unknown',
+    skills: levelSkills,
+    totalMinutes: levelSkills.reduce((sum, s) => sum + (s.estimatedMinutes || 30), 0),
+    thresholdCount: levelSkills.filter(s => s.isThresholdConcept).length,
+  }))
+
+  return {
+    stages,
+    totalSkills: skills.length,
+    totalMinutes: skills.reduce((sum, s) => sum + (s.estimatedMinutes || 30), 0),
+    totalThresholdConcepts: skills.filter(s => s.isThresholdConcept).length,
+  }
 }

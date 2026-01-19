@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2 } from "lucide-react";
+import Link from "next/link";
+import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2, BookOpen, GraduationCap, Users, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -233,6 +234,66 @@ export function OutputsPanel({
 
   return (
     <div className="flex flex-col h-full gap-6 p-4">
+      {/* LearnGraph Features - only shown when in a notebook context */}
+      {notebookId && (
+        <section className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+          <div className="flex items-center gap-2 mb-3">
+            <BookOpen className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-black">LearnGraph Features</h3>
+          </div>
+          <p className="text-xs text-gray-600 mb-4">
+            AI-powered educational tools grounded in learning science research
+          </p>
+          <div className="space-y-2">
+            <Link
+              href={`/notebooks/${notebookId}/curriculum`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                  <BookOpen className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">Content Features</div>
+                  <div className="text-xs text-gray-500">10 features powered by ed psych research</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/for-teachers`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                  <GraduationCap className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">For Teachers</div>
+                  <div className="text-xs text-gray-500">6 AI tools for teaching materials</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-green-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/for-students`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                  <Users className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">For Students</div>
+                  <div className="text-xs text-gray-500">5 AI tools for learning & practice</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-500" />
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Audio Overview */}
       <section className="bg-gray-50 rounded-xl p-4 border border-gray-200">
         <div className="flex items-center justify-between mb-4">

@@ -19,6 +19,16 @@ export const BLOOM_DESCRIPTIONS: Record<BloomLevel, string> = {
   6: 'Produce new or original work',
 }
 
+// Assessment types for skills
+export type AssessmentType = 'formative' | 'summative' | 'performance' | 'diagnostic' | 'peer'
+
+// Suggested assessment with Bloom's alignment
+export interface SuggestedAssessment {
+  type: AssessmentType
+  description: string
+  bloomAlignment: BloomLevel[]
+}
+
 // Skill/Concept node extracted from content
 export interface SkillNode {
   id: string
@@ -34,6 +44,13 @@ export interface SkillNode {
   estimatedMinutes?: number
   difficulty?: number // 1-10
 
+  // Item Response Theory (IRT) - 3PL model parameters
+  irt?: {
+    difficulty: number // b parameter: -3 to +3 (higher = harder)
+    discrimination: number // a parameter: 0.5 to 2.5 (higher = better differentiates ability)
+    guessing: number // c parameter: 0 to 0.5 (probability of guessing correctly)
+  }
+
   // Threshold concepts (transformative, troublesome knowledge)
   isThresholdConcept: boolean
   thresholdProperties?: {
@@ -41,11 +58,26 @@ export interface SkillNode {
     troublesomeAspects?: string[]
   }
 
-  // Cognitive load
+  // Cognitive load (from Cognitive Load Theory)
   cognitiveLoadEstimate?: 'low' | 'medium' | 'high'
   chunksRequired?: number // Working memory slots needed
+  elementInteractivity?: 'low' | 'medium' | 'high' // How many elements must be processed simultaneously
 
-  // Scaffolding levels (fading support)
+  // Mastery & Assessment (from Mastery Learning research)
+  masteryThreshold?: number // Default 0.80, threshold concepts 0.90
+  assessmentTypes?: AssessmentType[]
+  suggestedAssessments?: SuggestedAssessment[]
+
+  // Spaced Repetition (from Ebbinghaus forgetting curve research)
+  reviewIntervals?: number[] // Days: [1, 3, 7, 14, 30, 60]
+
+  // Common Issues (for proactive teaching)
+  commonMisconceptions?: string[]
+
+  // Transfer (where else this skill applies)
+  transferDomains?: string[]
+
+  // Scaffolding levels (fading support from Instructional Scaffolding research)
   scaffoldingLevels?: {
     level1: string // Full worked examples
     level2: string // Partial solutions
