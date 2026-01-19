@@ -2,11 +2,12 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, HelpCircle, MessageSquare, AlertTriangle, GitBranch, Loader2, ChevronDown, Sparkles, X, Copy, Check, Download, Printer } from 'lucide-react'
+import { ArrowLeft, BookOpen, HelpCircle, MessageSquare, AlertTriangle, GitBranch, Loader2, ChevronDown, Sparkles, X, Copy, Check, Download, Printer, Library } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import ReactMarkdown, { Components } from 'react-markdown'
+import { ArtifactGenerator } from '@/components/artifacts/ArtifactGenerator'
 
 // Custom markdown components for better formatting
 const markdownComponents: Components = {
@@ -656,6 +657,12 @@ export default function ForStudentsPage({ params }: PageProps) {
                 <p className="text-sm text-gray-500">Study smarter with tools grounded in learning science</p>
               </div>
             </div>
+            <Button variant="outline" asChild className="gap-2">
+              <Link href={`/notebooks/${notebookId}/library`}>
+                <Library className="h-4 w-4" />
+                Artifact Library
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -874,6 +881,14 @@ export default function ForStudentsPage({ params }: PageProps) {
                         )}
                       </div>
                     )}
+
+                    {/* Visual Artifacts */}
+                    <ArtifactGenerator
+                      notebookId={notebookId}
+                      skill={selectedSkill}
+                      toolId={tool.id}
+                      audience="student"
+                    />
                   </CardContent>
                 </Card>
               ))}

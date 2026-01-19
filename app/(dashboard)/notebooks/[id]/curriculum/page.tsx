@@ -2,10 +2,11 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, BookOpen, Brain, Target, AlertTriangle, Lightbulb, RefreshCw, Clock, Layers, GitBranch, Route, GraduationCap, ClipboardCheck, Footprints, XCircle, Globe, BarChart3, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Brain, Target, AlertTriangle, Lightbulb, RefreshCw, Clock, Layers, GitBranch, Route, GraduationCap, ClipboardCheck, Footprints, XCircle, Globe, BarChart3, ChevronDown, ChevronUp, X, Library } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { ArtifactGenerator } from '@/components/artifacts/ArtifactGenerator'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -126,6 +127,254 @@ function FeatureSection({
   )
 }
 
+// Clickable Stat Card Component
+function StatCard({
+  icon: Icon,
+  value,
+  label,
+  color,
+  onClick,
+}: {
+  icon: React.ElementType
+  value: string | number
+  label: string
+  color: string
+  onClick: () => void
+}) {
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-md hover:border-gray-300 transition-all group"
+      onClick={onClick}
+    >
+      <CardContent className="pt-4 text-center">
+        <Icon className={`h-6 w-6 ${color} mx-auto mb-1 group-hover:scale-110 transition-transform`} />
+        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-xs text-gray-500">{label}</div>
+        <div className="text-xs text-blue-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to explore →</div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Stat Detail Modal Component
+function StatDetailModal({
+  type,
+  onClose,
+  allSkills,
+  thresholdConcepts,
+  highLoadSkills,
+  entryPoints,
+  overview,
+}: {
+  type: 'skills' | 'threshold' | 'cognitive' | 'time' | 'entry'
+  onClose: () => void
+  allSkills: Skill[]
+  thresholdConcepts: Skill[]
+  highLoadSkills: Skill[]
+  entryPoints: Skill[]
+  overview: CurriculumOverview
+}) {
+  const config = {
+    skills: {
+      title: 'Total Skills',
+      icon: Layers,
+      iconColor: 'text-blue-500',
+      bgColor: 'from-blue-600 to-blue-700',
+      explanation: 'Skills are the discrete learning objectives extracted from your content. Each skill represents a specific competency that learners should be able to demonstrate after instruction.',
+      importance: 'Knowing the total skill count helps you: (1) Estimate course duration, (2) Plan assessment scope, (3) Identify coverage gaps, (4) Balance curriculum breadth vs depth.',
+      items: allSkills,
+      renderItem: (skill: Skill) => (
+        <div key={skill.id} className="p-3 bg-white border rounded-lg hover:shadow-sm transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-sm">{skill.name}</span>
+            <span className={`px-2 py-0.5 rounded text-xs ${bloomLevelColors[skill.bloomLevel]}`}>
+              Level {skill.bloomLevel}
+            </span>
+          </div>
+          {skill.description && <p className="text-xs text-gray-500 mt-1">{skill.description}</p>}
+          <div className="flex gap-2 mt-2 text-xs text-gray-400">
+            <span>{skill.estimatedMinutes || 30} min</span>
+            {skill.cognitiveLoadEstimate && <span>• {skill.cognitiveLoadEstimate} load</span>}
+          </div>
+        </div>
+      ),
+    },
+    threshold: {
+      title: 'Threshold Concepts',
+      icon: Lightbulb,
+      iconColor: 'text-yellow-500',
+      bgColor: 'from-yellow-500 to-amber-600',
+      explanation: 'Threshold concepts are transformative ideas that fundamentally change how learners understand a subject. Once grasped, they open up previously inaccessible ways of thinking. They are characterized by being: Transformative (changes worldview), Irreversible (hard to unlearn), Integrative (connects ideas), Troublesome (often counterintuitive), and Bounded (defines discipline limits).',
+      importance: 'Threshold concepts are critical because: (1) They require 90% mastery vs 80% for regular skills, (2) Students often get "stuck" at these points, (3) They unlock understanding of subsequent material, (4) Extra instructional time and support should be allocated here.',
+      items: thresholdConcepts,
+      renderItem: (skill: Skill) => (
+        <div key={skill.id} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-yellow-600" />
+            <span className="font-medium text-sm">{skill.name}</span>
+          </div>
+          {skill.thresholdProperties && skill.thresholdProperties.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {skill.thresholdProperties.map((prop, i) => (
+                <span key={i} className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs">{prop}</span>
+              ))}
+            </div>
+          )}
+          {skill.description && <p className="text-xs text-gray-600 mt-2">{skill.description}</p>}
+        </div>
+      ),
+    },
+    cognitive: {
+      title: 'High Cognitive Load Skills',
+      icon: Brain,
+      iconColor: 'text-red-500',
+      bgColor: 'from-red-500 to-rose-600',
+      explanation: 'Cognitive Load Theory (Sweller, 1988) states that working memory has limited capacity. High cognitive load skills require processing many elements simultaneously, which can overwhelm learners if not properly scaffolded.',
+      importance: 'High cognitive load skills need special attention: (1) Break into smaller sub-skills, (2) Provide worked examples first, (3) Use diagrams to reduce verbal processing, (4) Allow more practice time, (5) Reduce extraneous information during instruction.',
+      items: highLoadSkills,
+      renderItem: (skill: Skill) => (
+        <div key={skill.id} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-sm">{skill.name}</span>
+            <div className="flex gap-1">
+              {skill.elementInteractivity && (
+                <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs">{skill.elementInteractivity} interactivity</span>
+              )}
+              {skill.chunksRequired && (
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs">{skill.chunksRequired} chunks</span>
+              )}
+            </div>
+          </div>
+          {skill.description && <p className="text-xs text-gray-600 mt-2">{skill.description}</p>}
+        </div>
+      ),
+    },
+    time: {
+      title: 'Estimated Learning Time',
+      icon: Clock,
+      iconColor: 'text-green-500',
+      bgColor: 'from-green-500 to-emerald-600',
+      explanation: 'Learning time estimates are calculated based on skill complexity, Bloom\'s taxonomy level, and cognitive load. Higher-level skills (Analyze, Evaluate, Create) typically require more time than lower-level skills (Remember, Understand).',
+      importance: 'Accurate time estimates help you: (1) Plan realistic course schedules, (2) Set learner expectations, (3) Identify time-intensive sections, (4) Balance workload across modules, (5) Justify curriculum decisions to stakeholders.',
+      items: overview.stages,
+      renderItem: (stage: BloomStage) => (
+        <div key={stage.bloomLevel} className="p-3 bg-white border rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className={`px-2 py-1 rounded text-xs font-medium ${bloomLevelColors[stage.bloomLevel]}`}>
+              Level {stage.bloomLevel}: {stage.bloomLabel}
+            </span>
+            <span className="font-bold text-green-700">{stage.totalMinutes} min</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span>{stage.skills.length} skills</span>
+            <span>~{Math.round(stage.totalMinutes / Math.max(stage.skills.length, 1))} min/skill avg</span>
+          </div>
+          <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 rounded-full"
+              style={{ width: `${Math.min((stage.totalMinutes / overview.totalMinutes) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      ),
+    },
+    entry: {
+      title: 'Entry Points',
+      icon: Target,
+      iconColor: 'text-purple-500',
+      bgColor: 'from-purple-500 to-violet-600',
+      explanation: 'Entry points are skills with no prerequisites—where learners can begin studying. They represent the foundational concepts that don\'t depend on prior domain knowledge (within this content).',
+      importance: 'Entry points are valuable for: (1) Onboarding new learners, (2) Diagnostic assessments (test these first), (3) Identifying starting points for different learner levels, (4) Creating multiple learning paths, (5) Ensuring content accessibility.',
+      items: entryPoints,
+      renderItem: (skill: Skill) => (
+        <div key={skill.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-purple-600" />
+            <span className="font-medium text-sm">{skill.name}</span>
+          </div>
+          <div className="flex gap-2 mt-2 text-xs text-gray-500">
+            <span className={`px-2 py-0.5 rounded ${bloomLevelColors[skill.bloomLevel]}`}>
+              Level {skill.bloomLevel}
+            </span>
+            <span>{skill.estimatedMinutes || 30} min</span>
+          </div>
+          {skill.description && <p className="text-xs text-gray-600 mt-2">{skill.description}</p>}
+        </div>
+      ),
+    },
+  }
+
+  const currentConfig = config[type]
+  const IconComponent = currentConfig.icon
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className={`bg-gradient-to-r ${currentConfig.bgColor} px-6 py-4 text-white`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <IconComponent className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">{currentConfig.title}</h3>
+                <p className="text-white/80 text-sm">{currentConfig.items.length} items</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-white hover:bg-white/20"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Explanation */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              What is this?
+            </h4>
+            <p className="text-sm text-blue-800">{currentConfig.explanation}</p>
+          </div>
+
+          {/* Why it matters */}
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <h4 className="font-medium text-amber-900 mb-2 flex items-center gap-2">
+              <Lightbulb className="h-4 w-4" />
+              Why does this matter?
+            </h4>
+            <p className="text-sm text-amber-800">{currentConfig.importance}</p>
+          </div>
+
+          {/* Items list */}
+          <div>
+            <h4 className="font-medium text-gray-700 mb-3">
+              {type === 'time' ? 'Time by Bloom\'s Level' : `All ${currentConfig.title}`} ({currentConfig.items.length})
+            </h4>
+            {currentConfig.items.length > 0 ? (
+              <div className="space-y-2 max-h-[300px] overflow-auto pr-2">
+                {currentConfig.items.map((item) => currentConfig.renderItem(item as any))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <IconComponent className={`h-12 w-12 mx-auto mb-2 opacity-30 ${currentConfig.iconColor}`} />
+                <p>No items found in this category.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CurriculumPage({ params }: PageProps) {
   const { id: notebookId } = use(params)
   const { toast } = useToast()
@@ -136,6 +385,9 @@ export default function CurriculumPage({ params }: PageProps) {
   const [entryPoints, setEntryPoints] = useState<Skill[]>([])
   const [error, setError] = useState<string | null>(null)
   const [available, setAvailable] = useState(true)
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [expandedStat, setExpandedStat] = useState<'skills' | 'threshold' | 'cognitive' | 'time' | 'entry' | null>(null)
 
   const fetchCurriculum = async () => {
     setLoading(true)
@@ -151,6 +403,14 @@ export default function CurriculumPage({ params }: PageProps) {
       setAvailable(data.available !== false)
       setOverview(data.overview || null)
       setEntryPoints(data.entryPoints || [])
+
+      // Set first skill as selected for artifact generation
+      if (data.overview?.stages) {
+        const allSkills = data.overview.stages.flatMap((s: BloomStage) => s.skills)
+        if (allSkills.length > 0 && !selectedSkill) {
+          setSelectedSkill(allSkills[0])
+        }
+      }
 
       if (data.message && (!data.overview || data.overview.totalSkills === 0)) {
         setError(data.message)
@@ -221,15 +481,23 @@ export default function CurriculumPage({ params }: PageProps) {
                 <p className="text-sm text-gray-500">10 features powered by educational psychology research</p>
               </div>
             </div>
-            <Button
-              onClick={extractGraph}
-              disabled={extracting}
-              variant="outline"
-              className="gap-2"
-            >
-              {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {extracting ? 'Extracting...' : 'Re-extract Graph'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" asChild className="gap-2">
+                <Link href={`/notebooks/${notebookId}/library`}>
+                  <Library className="h-4 w-4" />
+                  Artifact Library
+                </Link>
+              </Button>
+              <Button
+                onClick={extractGraph}
+                disabled={extracting}
+                variant="outline"
+                className="gap-2"
+              >
+                {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {extracting ? 'Extracting...' : 'Re-extract Graph'}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -257,44 +525,102 @@ export default function CurriculumPage({ params }: PageProps) {
           </div>
         ) : overview ? (
           <div className="space-y-6">
-            {/* Summary Stats */}
+            {/* Summary Stats - Clickable */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Layers className="h-6 w-6 text-blue-500 mx-auto mb-1" />
-                  <div className="text-2xl font-bold">{overview.totalSkills}</div>
-                  <div className="text-xs text-gray-500">Total Skills</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Lightbulb className="h-6 w-6 text-yellow-500 mx-auto mb-1" />
-                  <div className="text-2xl font-bold">{overview.totalThresholdConcepts}</div>
-                  <div className="text-xs text-gray-500">Threshold Concepts</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Brain className="h-6 w-6 text-red-500 mx-auto mb-1" />
-                  <div className="text-2xl font-bold">{highLoadSkills.length}</div>
-                  <div className="text-xs text-gray-500">High Cognitive Load</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Clock className="h-6 w-6 text-green-500 mx-auto mb-1" />
-                  <div className="text-2xl font-bold">{Math.round(overview.totalMinutes / 60)}h</div>
-                  <div className="text-xs text-gray-500">Est. Learning Time</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Target className="h-6 w-6 text-purple-500 mx-auto mb-1" />
-                  <div className="text-2xl font-bold">{entryPoints.length}</div>
-                  <div className="text-xs text-gray-500">Entry Points</div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Layers}
+                value={overview.totalSkills}
+                label="Total Skills"
+                color="text-blue-500"
+                onClick={() => setExpandedStat('skills')}
+              />
+              <StatCard
+                icon={Lightbulb}
+                value={overview.totalThresholdConcepts}
+                label="Threshold Concepts"
+                color="text-yellow-500"
+                onClick={() => setExpandedStat('threshold')}
+              />
+              <StatCard
+                icon={Brain}
+                value={highLoadSkills.length}
+                label="High Cognitive Load"
+                color="text-red-500"
+                onClick={() => setExpandedStat('cognitive')}
+              />
+              <StatCard
+                icon={Clock}
+                value={`${Math.round(overview.totalMinutes / 60)}h`}
+                label="Est. Learning Time"
+                color="text-green-500"
+                onClick={() => setExpandedStat('time')}
+              />
+              <StatCard
+                icon={Target}
+                value={entryPoints.length}
+                label="Entry Points"
+                color="text-purple-500"
+                onClick={() => setExpandedStat('entry')}
+              />
             </div>
+
+            {/* Stat Detail Modal */}
+            {expandedStat && overview && (
+              <StatDetailModal
+                type={expandedStat}
+                onClose={() => setExpandedStat(null)}
+                allSkills={allSkills}
+                thresholdConcepts={thresholdConcepts}
+                highLoadSkills={highLoadSkills}
+                entryPoints={entryPoints}
+                overview={overview}
+              />
+            )}
+
+            {/* Skill Selector for Visual Artifacts */}
+            <Card className="bg-purple-50 border-purple-200">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="font-medium text-purple-900">Generate Visual Artifacts</h3>
+                    <p className="text-sm text-purple-700">Select a skill to create illustrated educational materials</p>
+                  </div>
+                  <div className="relative">
+                    <button
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="w-64 flex items-center justify-between px-4 py-2 bg-white border border-purple-300 rounded-lg shadow-sm hover:border-purple-500 transition-colors"
+                    >
+                      <div className="text-left truncate">
+                        <div className="font-medium text-sm">{selectedSkill?.name || 'Select a skill'}</div>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform shrink-0 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {dropdownOpen && (
+                      <div className="absolute z-50 mt-1 w-64 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
+                        {allSkills.map((skill) => (
+                          <button
+                            key={skill.id}
+                            onClick={() => {
+                              setSelectedSkill(skill)
+                              setDropdownOpen(false)
+                            }}
+                            className={`w-full px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0 text-sm ${
+                              selectedSkill?.id === skill.id ? 'bg-purple-50' : ''
+                            }`}
+                          >
+                            <div className="font-medium truncate">{skill.name}</div>
+                            <div className="text-xs text-gray-500">
+                              Level {skill.bloomLevel} • {skill.cognitiveLoadEstimate || 'Medium'} Load
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Feature 1: Curriculum Overview */}
             <FeatureSection
@@ -356,6 +682,14 @@ export default function CurriculumPage({ params }: PageProps) {
                     </div>
                   ))}
                 </div>
+
+                {/* Visual Artifacts */}
+                <ArtifactGenerator
+                  notebookId={notebookId}
+                  skill={selectedSkill}
+                  toolId="curriculum-overview"
+                  audience="curriculum"
+                />
               </div>
             </FeatureSection>
 
@@ -458,6 +792,14 @@ export default function CurriculumPage({ params }: PageProps) {
                     <p className="text-sm text-yellow-700 mt-1">No threshold concepts identified in current extraction.</p>
                   )}
                 </div>
+
+                {/* Visual Artifacts */}
+                <ArtifactGenerator
+                  notebookId={notebookId}
+                  skill={selectedSkill}
+                  toolId="threshold-concepts"
+                  audience="curriculum"
+                />
               </div>
             </FeatureSection>
 
@@ -508,6 +850,14 @@ export default function CurriculumPage({ params }: PageProps) {
                     </div>
                   </div>
                 )}
+
+                {/* Visual Artifacts */}
+                <ArtifactGenerator
+                  notebookId={notebookId}
+                  skill={selectedSkill}
+                  toolId="cognitive-load"
+                  audience="curriculum"
+                />
               </div>
             </FeatureSection>
 
@@ -538,6 +888,14 @@ export default function CurriculumPage({ params }: PageProps) {
                   </tbody>
                 </table>
               </div>
+
+              {/* Visual Artifacts */}
+              <ArtifactGenerator
+                notebookId={notebookId}
+                skill={selectedSkill}
+                toolId="assessment-suggestions"
+                audience="curriculum"
+              />
             </FeatureSection>
 
             {/* Feature 7: Scaffolding Guidance */}

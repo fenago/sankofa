@@ -165,6 +165,51 @@ export type Database = {
         }
         Relationships: []
       }
+      artifacts: {
+        Row: {
+          id: string
+          notebook_id: string
+          user_id: string
+          skill_name: string
+          skill_description: string | null
+          artifact_type: string
+          audience: 'student' | 'teacher' | 'curriculum'
+          tool_id: string
+          image_data: string
+          text_content: string | null
+          model_used: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          notebook_id: string
+          user_id: string
+          skill_name: string
+          skill_description?: string | null
+          artifact_type: string
+          audience: 'student' | 'teacher' | 'curriculum'
+          tool_id: string
+          image_data: string
+          text_content?: string | null
+          model_used?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          notebook_id?: string
+          user_id?: string
+          skill_name?: string
+          skill_description?: string | null
+          artifact_type?: string
+          audience?: 'student' | 'teacher' | 'curriculum'
+          tool_id?: string
+          image_data?: string
+          text_content?: string | null
+          model_used?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -202,11 +247,13 @@ export type Notebook = Database['public']['Tables']['notebooks']['Row']
 export type Source = Database['public']['Tables']['sources']['Row']
 export type Chunk = Database['public']['Tables']['chunks']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
+export type Artifact = Database['public']['Tables']['artifacts']['Row']
 
 export type NotebookInsert = Database['public']['Tables']['notebooks']['Insert']
 export type SourceInsert = Database['public']['Tables']['sources']['Insert']
 export type ChunkInsert = Database['public']['Tables']['chunks']['Insert']
 export type MessageInsert = Database['public']['Tables']['messages']['Insert']
+export type ArtifactInsert = Database['public']['Tables']['artifacts']['Insert']
 
 export type SourceType = Database['public']['Enums']['source_type']
 export type SourceStatus = Database['public']['Enums']['source_status']

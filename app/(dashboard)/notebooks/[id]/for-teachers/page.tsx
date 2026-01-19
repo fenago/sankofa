@@ -2,11 +2,12 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, HelpCircle, FileText, MessageSquare, AlertTriangle, GitBranch, Loader2, ChevronDown, Sparkles, X, Copy, Check, Download, Printer } from 'lucide-react'
+import { ArrowLeft, BookOpen, HelpCircle, FileText, MessageSquare, AlertTriangle, GitBranch, Loader2, ChevronDown, ChevronRight, Sparkles, X, Copy, Check, Download, Printer, Info, Library } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import ReactMarkdown, { Components } from 'react-markdown'
+import { ArtifactGenerator } from '@/components/artifacts/ArtifactGenerator'
 
 // Custom markdown components for better formatting
 const markdownComponents: Components = {
@@ -556,6 +557,7 @@ export default function ForTeachersPage({ params }: PageProps) {
   const [generating, setGenerating] = useState<string | null>(null)
   const [generatedContent, setGeneratedContent] = useState<{ toolId: string; content: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showDifferences, setShowDifferences] = useState(false)
 
   useEffect(() => {
     const fetchSkills = async () => {
@@ -655,6 +657,12 @@ export default function ForTeachersPage({ params }: PageProps) {
                 <p className="text-sm text-gray-500">Generate research-backed teaching materials</p>
               </div>
             </div>
+            <Button variant="outline" asChild className="gap-2">
+              <Link href={`/notebooks/${notebookId}/library`}>
+                <Library className="h-4 w-4" />
+                Artifact Library
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -675,6 +683,58 @@ export default function ForTeachersPage({ params }: PageProps) {
           </div>
         ) : (
           <>
+            {/* Info: Difference between Teacher and Student Tools */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowDifferences(!showDifferences)}
+                className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:text-green-800 hover:underline transition-colors"
+              >
+                {showDifferences ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <Info className="h-4 w-4" />
+                How are these different from the Student Tools?
+              </button>
+
+              {showDifferences && (
+                <div className="mt-3 p-4 bg-green-50 border border-green-200 rounded-lg text-sm">
+                  <h4 className="font-semibold text-green-900 mb-3">Teacher Tools vs. Student Tools</h4>
+
+                  <div className="space-y-3 text-green-800">
+                    <div>
+                      <span className="font-medium">Different Audience & Purpose:</span>
+                      <p className="text-green-700 mt-0.5">Student tools help learners study independently. Teacher tools generate classroom-ready instructional materials.</p>
+                    </div>
+
+                    <div>
+                      <span className="font-medium">Different Output Focus:</span>
+                      <ul className="mt-1 ml-4 list-disc text-green-700 space-y-0.5">
+                        <li><strong>Study Guides:</strong> Students get "what to learn" — Teachers get "what to teach" with assessment criteria</li>
+                        <li><strong>Practice Questions:</strong> Students get self-tests with hints — Teachers get assessments with rubrics & distractors</li>
+                        <li><strong>Concept Explainer:</strong> Students get simple→advanced — Teachers get differentiated materials for diverse learners</li>
+                        <li><strong>Misconceptions:</strong> Students get self-checks — Teachers get instructional strategies to surface & correct</li>
+                        <li><strong>Prerequisites:</strong> Students get "Am I ready?" — Teachers get diagnostic assessments & remediation paths</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <span className="font-medium">Exclusive to Teachers:</span>
+                      <p className="text-green-700 mt-0.5">
+                        <strong>Lesson Plan Generator</strong> — Creates complete lesson plans with SWBAT objectives, timed activities, differentiation notes, and exit tickets.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <Link
+                      href={`/notebooks/${notebookId}/for-students`}
+                      className="text-green-700 hover:text-green-900 underline text-xs"
+                    >
+                      View Student Tools →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Skill Selector */}
             <div className="mb-8">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -820,6 +880,14 @@ export default function ForTeachersPage({ params }: PageProps) {
                         )}
                       </div>
                     )}
+
+                    {/* Visual Artifacts */}
+                    <ArtifactGenerator
+                      notebookId={notebookId}
+                      skill={selectedSkill}
+                      toolId={tool.id}
+                      audience="teacher"
+                    />
                   </CardContent>
                 </Card>
               ))}
