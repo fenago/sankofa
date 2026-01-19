@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, X, Download, Image as ImageIcon, Wand2, Save, Check, Clock, Sparkles, Palette, Info, Library } from 'lucide-react'
+import { Loader2, X, Download, Image as ImageIcon, Wand2, Save, Check, Clock, Sparkles, Palette, Info, Library, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
@@ -101,17 +101,25 @@ function GeneratingOverlay({
   )
 }
 
-// Artifact button with description
+// Artifact button with description and prompt link
 function ArtifactButton({
   artifact,
   onClick,
   disabled,
+  notebookId,
+  audience,
+  toolId,
 }: {
   artifact: ArtifactType
   onClick: () => void
   disabled: boolean
+  notebookId: string
+  audience: 'student' | 'teacher' | 'curriculum'
+  toolId: string
 }) {
   const [showInfo, setShowInfo] = useState(false)
+
+  const promptLink = `/notebooks/${notebookId}/prompts?audience=${audience}&toolId=${toolId}&artifactId=${artifact.id}`
 
   return (
     <div className="relative">
@@ -125,16 +133,27 @@ function ArtifactButton({
           <div className="font-medium text-sm text-gray-800">{artifact.name}</div>
           <div className="text-xs text-gray-500 truncate">{artifact.description}</div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowInfo(!showInfo)
-          }}
-          className="p-1 rounded-full hover:bg-purple-100 text-gray-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Link
+            href={promptLink}
+            onClick={(e) => e.stopPropagation()}
+            className="p-1 rounded-full hover:bg-blue-100 text-gray-400 hover:text-blue-600"
+            title="View/Edit Prompt"
+          >
+            <FileText className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowInfo(!showInfo)
+            }}
+            className="p-1 rounded-full hover:bg-purple-100 text-gray-400 hover:text-purple-600"
+            title="More Info"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </button>
       {showInfo && (
         <div className="absolute left-full ml-2 top-0 z-50 w-64 p-3 bg-white rounded-lg shadow-xl border text-sm">
@@ -143,7 +162,17 @@ function ArtifactButton({
             <span className="font-semibold text-gray-800">{artifact.name}</span>
           </div>
           <p className="text-gray-600 text-xs">{artifact.description}</p>
-          <p className="text-purple-600 text-xs mt-2 font-medium">Click to generate</p>
+          <div className="mt-2 pt-2 border-t flex items-center justify-between">
+            <p className="text-purple-600 text-xs font-medium">Click to generate</p>
+            <Link
+              href={promptLink}
+              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <FileText className="h-3 w-3" />
+              Edit Prompt
+            </Link>
+          </div>
         </div>
       )}
     </div>
@@ -229,6 +258,7 @@ export function ArtifactGenerator({
           skillName: skill.name,
           skillDescription: skill.description,
           artifactType: artifactType.name,
+          artifactId: artifactType.id,
           artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
           audience,
           toolId,
@@ -317,6 +347,9 @@ export function ArtifactGenerator({
                     artifact={art}
                     onClick={() => generateArtifact(art)}
                     disabled={!!generating}
+                    notebookId={notebookId}
+                    audience={audience}
+                    toolId={toolId}
                   />
                 ))}
               </div>
@@ -351,29 +384,49 @@ export function ArtifactGenerator({
   return (
     <>
       <div className="border-t pt-4 mt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Wand2 className="h-4 w-4 text-purple-600" />
-          <span className="text-sm font-medium text-gray-700">Create Visual Artifacts</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-purple-600" />
+            <span className="text-sm font-medium text-gray-700">Create Visual Artifacts</span>
+          </div>
+          <Link
+            href={`/notebooks/${notebookId}/prompts?audience=${audience}&toolId=${toolId}`}
+            className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          >
+            <FileText className="h-3 w-3" />
+            Edit Prompts
+          </Link>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {artifacts.map((art) => (
-            <button
-              key={art.id}
-              onClick={() => generateArtifact(art)}
-              disabled={!skill || generating === art.id}
-              className="flex items-center gap-3 p-3 text-left rounded-lg hover:bg-purple-50 border border-gray-200 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {generating === art.id ? (
-                <Loader2 className="h-5 w-5 animate-spin text-purple-600 flex-shrink-0" />
-              ) : (
-                <span className="text-xl flex-shrink-0">{art.icon}</span>
-              )}
-              <div className="min-w-0">
-                <div className="font-medium text-sm text-gray-800">{art.name}</div>
-                <div className="text-xs text-gray-500">{art.description}</div>
+          {artifacts.map((art) => {
+            const promptLink = `/notebooks/${notebookId}/prompts?audience=${audience}&toolId=${toolId}&artifactId=${art.id}`
+            return (
+              <div key={art.id} className="relative group">
+                <button
+                  onClick={() => generateArtifact(art)}
+                  disabled={!skill || generating === art.id}
+                  className="w-full flex items-center gap-3 p-3 text-left rounded-lg hover:bg-purple-50 border border-gray-200 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating === art.id ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-purple-600 flex-shrink-0" />
+                  ) : (
+                    <span className="text-xl flex-shrink-0">{art.icon}</span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-gray-800">{art.name}</div>
+                    <div className="text-xs text-gray-500">{art.description}</div>
+                  </div>
+                </button>
+                <Link
+                  href={promptLink}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-white shadow-sm border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-gray-400 hover:text-blue-600"
+                  title="View/Edit Prompt"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                </Link>
               </div>
-            </button>
-          ))}
+            )
+          })}
         </div>
         <p className="text-xs text-gray-500 mt-3">
           AI-generated illustrations using Gemini 3.0 Pro Image
@@ -614,6 +667,7 @@ export function QuickArtifactButtons({
           skillName: skill.name,
           skillDescription: skill.description,
           artifactType: artifactType.name,
+          artifactId: artifactType.id,
           artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
           audience,
           toolId,
@@ -664,30 +718,41 @@ export function QuickArtifactButtons({
   return (
     <>
       <div className="flex flex-wrap gap-1.5">
-        {quickArtifacts.map((art) => (
-          <div key={art.id} className="relative group">
-            <button
-              onClick={() => generateArtifact(art)}
-              disabled={!skill || generating === art.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {generating === art.id ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <span>{art.icon}</span>
-              )}
-              {art.name}
-            </button>
-            {/* Tooltip on hover */}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-              <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-48 shadow-lg">
-                <div className="font-medium mb-0.5">{art.name}</div>
-                <div className="text-gray-300">{art.description}</div>
-                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+        {quickArtifacts.map((art) => {
+          const promptLink = `/notebooks/${notebookId}/prompts?audience=${audience}&toolId=${toolId}&artifactId=${art.id}`
+          return (
+            <div key={art.id} className="relative group">
+              <button
+                onClick={() => generateArtifact(art)}
+                disabled={!skill || generating === art.id}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating === art.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span>{art.icon}</span>
+                )}
+                {art.name}
+              </button>
+              {/* Tooltip on hover */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 w-52 shadow-lg">
+                  <div className="font-medium mb-0.5">{art.name}</div>
+                  <div className="text-gray-300 mb-2">{art.description}</div>
+                  <Link
+                    href={promptLink}
+                    className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileText className="h-3 w-3" />
+                    View/Edit Prompt
+                  </Link>
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Generating Overlay */}

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 // Force dynamic to prevent caching
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ interface ArtifactRequest {
   skillName: string
   skillDescription?: string
   artifactType: string
+  artifactId: string
   artifactPrompt: string
   audience: 'student' | 'teacher' | 'curriculum'
   toolId: string
@@ -34,6 +36,7 @@ export async function POST(
       skillName,
       skillDescription,
       artifactType,
+      artifactId,
       artifactPrompt,
       audience,
       toolId,
@@ -48,9 +51,44 @@ export async function POST(
       );
     }
 
+    // Check for custom prompt override
+    let finalPrompt = artifactPrompt;
+    let usingCustomPrompt = false;
+
+    if (artifactId) {
+      try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: override } = await supabase
+            .from('prompt_overrides')
+            .select('custom_prompt, is_active')
+            .eq('notebook_id', notebookId)
+            .eq('user_id', user.id)
+            .eq('audience', audience)
+            .eq('tool_id', toolId)
+            .eq('artifact_id', artifactId)
+            .single();
+
+          if (override?.custom_prompt && override.is_active !== false) {
+            // Replace placeholders in custom prompt
+            finalPrompt = override.custom_prompt
+              .replace(/\{skillName\}/g, skillName)
+              .replace(/\{skillDescription\}/g, skillDescription || '');
+            usingCustomPrompt = true;
+            console.log(`[Artifacts] Using custom prompt for ${audience}/${toolId}/${artifactId}`);
+          }
+        }
+      } catch (error) {
+        // Silently fall back to default prompt if override lookup fails
+        console.warn(`[Artifacts] Failed to check for custom prompt:`, error);
+      }
+    }
+
     const ai = new GoogleGenAI({ apiKey });
 
-    console.log(`[Artifacts] Generating ${artifactType} for "${skillName}" (${audience}/${toolId})`);
+    console.log(`[Artifacts] Generating ${artifactType} for "${skillName}" (${audience}/${toolId})${usingCustomPrompt ? ' [custom prompt]' : ''}`);
     console.log(`[Artifacts] Using text model: ${TEXT_MODEL}, image model: ${useHighQuality ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK}`);
 
     // Step 1: Use text model to refine the prompt for better image generation
@@ -63,7 +101,7 @@ Given this request to create a visual artifact:
 ${skillDescription ? `**Context:** ${skillDescription}` : ''}
 **Audience:** ${audience}
 **Original Prompt:**
-${artifactPrompt}
+${finalPrompt}
 
 Create an OPTIMIZED IMAGE GENERATION PROMPT that will produce a high-quality educational illustration. The prompt should:
 
