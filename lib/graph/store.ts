@@ -10,6 +10,7 @@ import type {
   EntityRelationship,
   GraphExtractionResult,
 } from '@/lib/types/graph'
+import type { InverseProfile } from '@/lib/types/interactions'
 
 // Neo4J Node type - the driver returns nodes with this structure
 interface Neo4JNode<T> {
@@ -645,15 +646,22 @@ export async function getAllPrerequisites(notebookId: string): Promise<Prerequis
 /**
  * Generate a topologically sorted learning path from start to goal skill
  * Uses Kahn's algorithm for topological sort
+ *
+ * @param notebookId - The notebook to generate path for
+ * @param goalSkillId - The target skill to reach
+ * @param masteredSkillIds - Skills already mastered (to exclude)
+ * @param profile - Optional inverse profile for personalization
  */
 export async function generateLearningPath(
   notebookId: string,
   goalSkillId: string,
-  masteredSkillIds: string[] = []
+  masteredSkillIds: string[] = [],
+  profile?: InverseProfile | null
 ): Promise<{
   path: SkillNode[]
   totalEstimatedMinutes: number
   thresholdConcepts: SkillNode[]
+  dailyChunks?: { day: number; skills: SkillNode[]; minutes: number }[]
 }> {
   // First, get all skills that are prerequisites (direct or transitive) of the goal
   const result = await runQuery<{ s: Neo4JNode<SkillNode> | SkillNode; depth: number }>(
@@ -731,26 +739,153 @@ export async function generateLearningPath(
 
   // Build final path
   const skillMap = new Map(remainingSkills.map(s => [s.id, s]))
-  const path = sortedIds.map(id => skillMap.get(id)!).filter(Boolean)
+  let path = sortedIds.map(id => skillMap.get(id)!).filter(Boolean)
 
-  // Calculate totals
-  const totalEstimatedMinutes = path.reduce((sum, s) => sum + (s.estimatedMinutes || 30), 0)
+  // Profile-aware ordering adjustments
+  if (profile) {
+    const goalOrientation = profile.motivational_indicators.goalOrientation
+
+    // Within topological constraints, adjust ordering based on goal orientation
+    // For performance orientation: prefer easier skills first (already done by default)
+    // For mastery orientation: interleave difficulties for desirable difficulty
+    if (goalOrientation === 'mastery') {
+      path = interleaveByDifficulty(path)
+    }
+    // 'performance' and 'avoidance' use default easy-first ordering
+  }
+
+  // Calculate time with expertise-based adjustments
+  const expertiseMultiplier = profile
+    ? getExpertiseTimeMultiplier(profile.cognitive_indicators.expertiseLevel)
+    : 1.0
+
+  const adjustedPath = path.map(skill => ({
+    ...skill,
+    adjustedMinutes: Math.round((skill.estimatedMinutes ?? 30) * expertiseMultiplier),
+  }))
+
+  const totalEstimatedMinutes = adjustedPath.reduce(
+    (sum, s) => sum + (s.adjustedMinutes ?? s.estimatedMinutes ?? 30),
+    0
+  )
   const thresholdConcepts = path.filter(s => s.isThresholdConcept)
 
+  // Generate daily chunks based on cognitive load threshold
+  let dailyChunks: { day: number; skills: SkillNode[]; minutes: number }[] | undefined
+
+  if (profile) {
+    const dailyMinuteLimit = getDailyMinuteLimit(profile.cognitive_indicators.cognitiveLoadThreshold)
+    dailyChunks = chunkByDailyLoad(adjustedPath, dailyMinuteLimit)
+  }
+
   return {
-    path,
+    path: adjustedPath,
     totalEstimatedMinutes,
     thresholdConcepts,
+    dailyChunks,
   }
+}
+
+/**
+ * Interleave skills by difficulty for desirable difficulty (mastery orientation)
+ */
+function interleaveByDifficulty(skills: SkillNode[]): SkillNode[] {
+  if (skills.length <= 2) return skills
+
+  // Split into easy, medium, hard based on difficulty
+  const easy = skills.filter(s => (s.difficulty ?? 0.5) < 0.35)
+  const medium = skills.filter(s => (s.difficulty ?? 0.5) >= 0.35 && (s.difficulty ?? 0.5) < 0.65)
+  const hard = skills.filter(s => (s.difficulty ?? 0.5) >= 0.65)
+
+  // Interleave: easy, medium, hard, easy, medium, hard, ...
+  const result: SkillNode[] = []
+  const maxLen = Math.max(easy.length, medium.length, hard.length)
+
+  for (let i = 0; i < maxLen; i++) {
+    if (i < easy.length) result.push(easy[i])
+    if (i < medium.length) result.push(medium[i])
+    if (i < hard.length) result.push(hard[i])
+  }
+
+  return result
+}
+
+/**
+ * Get time multiplier based on expertise level
+ */
+function getExpertiseTimeMultiplier(expertise: string): number {
+  const multipliers: Record<string, number> = {
+    novice: 1.5,
+    beginner: 1.3,
+    intermediate: 1.0,
+    advanced: 0.85,
+    expert: 0.7,
+  }
+  return multipliers[expertise] ?? 1.0
+}
+
+/**
+ * Get daily minute limit based on cognitive load threshold
+ * @param threshold - numeric threshold (0-1 scale) where lower = less capacity
+ */
+function getDailyMinuteLimit(threshold: number | null): number {
+  // Map 0-1 scale to minute limits:
+  // < 0.4 (low capacity) -> 30 mins
+  // 0.4-0.7 (medium capacity) -> 60 mins
+  // > 0.7 (high capacity) -> 90 mins
+  const t = threshold ?? 0.5
+  if (t < 0.4) return 30
+  if (t <= 0.7) return 60
+  return 90
+}
+
+/**
+ * Chunk skills into daily segments based on cognitive load
+ */
+function chunkByDailyLoad(
+  skills: (SkillNode & { adjustedMinutes?: number })[],
+  dailyLimit: number
+): { day: number; skills: SkillNode[]; minutes: number }[] {
+  const chunks: { day: number; skills: SkillNode[]; minutes: number }[] = []
+  let currentDay = 1
+  let currentChunk: SkillNode[] = []
+  let currentMinutes = 0
+
+  for (const skill of skills) {
+    const minutes = skill.adjustedMinutes ?? skill.estimatedMinutes ?? 30
+
+    // If adding this skill exceeds daily limit, start a new day
+    if (currentMinutes + minutes > dailyLimit && currentChunk.length > 0) {
+      chunks.push({ day: currentDay, skills: currentChunk, minutes: currentMinutes })
+      currentDay++
+      currentChunk = []
+      currentMinutes = 0
+    }
+
+    currentChunk.push(skill)
+    currentMinutes += minutes
+  }
+
+  // Add final chunk
+  if (currentChunk.length > 0) {
+    chunks.push({ day: currentDay, skills: currentChunk, minutes: currentMinutes })
+  }
+
+  return chunks
 }
 
 /**
  * Get Zone of Proximal Development skills
  * These are skills where all required prerequisites are mastered
+ *
+ * @param notebookId - The notebook to get skills from
+ * @param masteredSkillIds - IDs of skills already mastered
+ * @param profile - Optional inverse profile for personalized filtering
  */
 export async function getZPDSkills(
   notebookId: string,
-  masteredSkillIds: string[]
+  masteredSkillIds: string[],
+  profile?: InverseProfile | null
 ): Promise<{
   skill: SkillNode
   readinessScore: number
@@ -770,6 +905,15 @@ export async function getZPDSkills(
     prereqMap.set(prereq.toSkillId, existing)
   }
 
+  // Extract profile-based thresholds
+  // cognitiveLoadThreshold is already a number (0-1 scale) or null
+  const cognitiveLoadThreshold = profile?.cognitive_indicators.cognitiveLoadThreshold ?? 0.65
+  const optimalComplexity = profile?.cognitive_indicators.optimalComplexityLevel ?? 0.5
+  const workingMemoryIndicator = profile?.cognitive_indicators.workingMemoryIndicator ?? 'medium'
+
+  // Use cognitive load threshold directly as the limit (it's already 0-1)
+  const loadLimit = cognitiveLoadThreshold
+
   const zpdSkills: {
     skill: SkillNode
     readinessScore: number
@@ -780,6 +924,23 @@ export async function getZPDSkills(
   for (const skill of skills) {
     // Skip already mastered skills
     if (masteredSet.has(skill.id)) continue
+
+    // Profile-aware filtering: skip skills that exceed cognitive load threshold
+    if (profile) {
+      // Convert string load estimate to numeric value
+      const loadMap: Record<string, number> = { low: 0.3, medium: 0.5, high: 0.8 }
+      const skillLoad = loadMap[skill.cognitiveLoadEstimate ?? 'medium'] ?? 0.5
+      if (skillLoad > loadLimit + 0.15) {
+        // Allow slight overflow but filter very high load skills
+        continue
+      }
+
+      // For low working memory, deprioritize high element interactivity
+      if (workingMemoryIndicator === 'low' && (skill.elementInteractivity ?? 'medium') === 'high') {
+        // Don't filter out entirely, but mark for lower ranking
+        // (ranking is handled in adaptive-learning-service.ts)
+      }
+    }
 
     const prereqs = prereqMap.get(skill.id) || []
     const requiredPrereqs = prereqs.filter(p => p.strength === 'required')
@@ -801,7 +962,15 @@ export async function getZPDSkills(
       const helpfulScore = helpfulPrereqs.length === 0 ? 1 : masteredHelpful.length / helpfulPrereqs.length
 
       // Weighted average: required (60%), recommended (30%), helpful (10%)
-      const readinessScore = requiredScore * 0.6 + recommendedScore * 0.3 + helpfulScore * 0.1
+      let readinessScore = requiredScore * 0.6 + recommendedScore * 0.3 + helpfulScore * 0.1
+
+      // Profile-aware score adjustments
+      if (profile) {
+        // Boost skills matching optimal complexity level
+        const skillDifficulty = skill.difficulty ?? 0.5
+        const complexityMatch = 1 - Math.abs(skillDifficulty - optimalComplexity)
+        readinessScore = readinessScore * 0.85 + complexityMatch * 0.15
+      }
 
       const prerequisitesMastered = prereqs
         .filter(p => masteredSet.has(p.fromSkillId))
@@ -828,6 +997,34 @@ export async function getZPDSkills(
   })
 
   return zpdSkills
+}
+
+/**
+ * Get all skill nodes for a notebook
+ * Alias for getSkillsByNotebook with a different name for API consistency
+ */
+export async function getSkillNodes(notebookId: string): Promise<SkillNode[]> {
+  return getSkillsByNotebook(notebookId)
+}
+
+/**
+ * Get a single skill by ID
+ */
+export async function getSkillById(skillId: string): Promise<SkillNode | null> {
+  const result = await runQuery<{ s: Neo4JNode<SkillNode> | SkillNode }>(
+    `
+    MATCH (s:Skill {id: $skillId})
+    RETURN s
+    LIMIT 1
+    `,
+    { skillId }
+  )
+
+  if (result.length === 0) {
+    return null
+  }
+
+  return extractProperties(result[0].s)
 }
 
 /**

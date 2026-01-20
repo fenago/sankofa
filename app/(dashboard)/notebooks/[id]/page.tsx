@@ -13,6 +13,8 @@ import { ChatInterface } from '@/components/ChatInterface'
 import { OutputsPanel } from '@/components/OutputsPanel'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { SessionProvider } from '@/components/providers/SessionProvider'
+import { InterventionHandler } from '@/components/InterventionHandler'
+import { useAdaptiveLearning } from '@/hooks/useAdaptiveLearning'
 import { Source, Message, ResponseLength } from '@/lib/types'
 import { CustomPrompts, getStoredPrompts } from '@/lib/prompts'
 
@@ -25,6 +27,20 @@ export default function NotebookPage({ params }: NotebookPageProps) {
   const { notebook, loading: notebookLoading, error: notebookError } = useNotebook(notebookId)
   const { sources, loading: sourcesLoading, refreshSources } = useSources(notebookId)
   const { toast } = useToast()
+
+  // Adaptive learning hook
+  const {
+    recommendations: adaptiveRecommendations,
+    interventions,
+    profileSummary: adaptiveProfileSummary,
+    totalZPDSkills: adaptiveTotalZPDSkills,
+    masteredCount: adaptiveMasteredCount,
+    hasProfile: adaptiveHasProfile,
+    loading: adaptiveLoading,
+    error: adaptiveError,
+    refetchAll: refreshAdaptive,
+    dismissIntervention,
+  } = useAdaptiveLearning(notebookId)
 
   // State (similar to home page)
   const [messages, setMessages] = useState<Message[]>([])
@@ -421,6 +437,11 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
   return (
     <SessionProvider notebookId={notebookId} autoStart={true}>
+      {/* Intervention handler for adaptive learning alerts */}
+      <InterventionHandler
+        interventions={interventions}
+        onDismiss={dismissIntervention}
+      />
     <div className="flex flex-col h-[calc(100vh-88px)] bg-white text-black font-sans overflow-hidden -mx-4 -my-6">
       {/* Notebook Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">
@@ -542,6 +563,15 @@ export default function NotebookPage({ params }: NotebookPageProps) {
               onGenerateSlides={handleGenerateSlides}
               onGenerateMindmap={handleGenerateMindmap}
               onGenerateSummary={() => generateSummary(sources)}
+              // Adaptive learning props
+              adaptiveRecommendations={adaptiveRecommendations}
+              adaptiveProfileSummary={adaptiveProfileSummary}
+              adaptiveTotalZPDSkills={adaptiveTotalZPDSkills}
+              adaptiveMasteredCount={adaptiveMasteredCount}
+              adaptiveHasProfile={adaptiveHasProfile}
+              adaptiveLoading={adaptiveLoading}
+              adaptiveError={adaptiveError}
+              onAdaptiveRefresh={refreshAdaptive}
             />
           </div>
         </div>

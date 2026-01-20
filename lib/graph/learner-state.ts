@@ -9,6 +9,7 @@
 
 import { runQuery, runWriteTransaction } from './neo4j'
 import type { LearnerSkillState, SkillNode } from '@/lib/types/graph'
+import type { InverseProfile } from '@/lib/types/interactions'
 
 // Neo4J Node type
 interface Neo4JNode<T> {
@@ -195,12 +196,49 @@ export function bktToSM2Quality(
 /**
  * Determine appropriate scaffolding level based on mastery
  * Implements "fading" - gradually removing support as learner improves
+ *
+ * @param pMastery - Current mastery probability (0-1)
+ * @param profile - Optional inverse profile for personalized adjustments
+ * @returns Scaffold level: 1 (most support) to 4 (independent)
+ *
+ * Profile adjustments:
+ * - Novice expertise: reduce level by 1 (more support)
+ * - Avoidant help-seeking: reduce level by 1 (encourage help usage)
+ * - Excessive help-seeking: increase level by 1 (encourage independence)
  */
-export function calculateScaffoldLevel(pMastery: number): 1 | 2 | 3 | 4 {
-  if (pMastery < 0.3) return 1      // Full worked examples
-  if (pMastery < 0.5) return 2      // Partial solutions
-  if (pMastery < 0.7) return 3      // Hints on request
-  return 4                           // Independent practice
+export function calculateScaffoldLevel(
+  pMastery: number,
+  profile?: InverseProfile | null
+): 1 | 2 | 3 | 4 {
+  // Base level from mastery
+  let level: number
+  if (pMastery < 0.3) level = 1      // Full worked examples
+  else if (pMastery < 0.5) level = 2 // Partial solutions
+  else if (pMastery < 0.7) level = 3 // Hints on request
+  else level = 4                      // Independent practice
+
+  // Apply profile adjustments
+  if (profile) {
+    const { expertiseLevel } = profile.cognitive_indicators
+    const { helpSeekingPattern } = profile.metacognitive_indicators
+
+    // Novices need more support
+    if (expertiseLevel === 'novice') {
+      level = Math.max(1, level - 1)
+    }
+
+    // Avoidant help-seekers need encouragement to use scaffolding
+    if (helpSeekingPattern === 'avoidant') {
+      level = Math.max(1, level - 1)
+    }
+
+    // Excessive help-seekers need encouragement toward independence
+    if (helpSeekingPattern === 'excessive') {
+      level = Math.min(4, level + 1)
+    }
+  }
+
+  return level as 1 | 2 | 3 | 4
 }
 
 // ============================================================================

@@ -2,7 +2,9 @@ import { SWRConfiguration } from 'swr'
 
 // Shared fetcher for SWR
 export const fetcher = async (url: string) => {
-  const res = await fetch(url)
+  const res = await fetch(url, {
+    credentials: 'include', // Include cookies for authentication
+  })
   if (!res.ok) {
     const error = new Error('An error occurred while fetching the data.')
     const data = await res.json().catch(() => ({}))

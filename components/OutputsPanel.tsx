@@ -14,7 +14,9 @@ import {
 import { MindMap } from "./MindMap";
 import { VisualizerSection } from "./VisualizerSection";
 import { VideoStudio } from "./VideoStudio";
+import { AdaptiveLearningSection } from "./AdaptiveLearningSection";
 import { Source } from "@/lib/types";
+import type { SkillRecommendation, ProfileSummary } from "@/hooks/useAdaptiveLearning";
 
 type ExpandedSection = "audio" | "mindmap" | "summary" | "slides" | "visualizer" | "video" | "graph" | null;
 
@@ -107,6 +109,16 @@ interface OutputsPanelProps {
   onGenerateSlides: () => void;
   onGenerateMindmap: () => void;
   onGenerateSummary: () => void;
+  // Adaptive learning props
+  adaptiveRecommendations?: SkillRecommendation[];
+  adaptiveProfileSummary?: ProfileSummary | null;
+  adaptiveTotalZPDSkills?: number;
+  adaptiveMasteredCount?: number;
+  adaptiveHasProfile?: boolean;
+  adaptiveLoading?: boolean;
+  adaptiveError?: string | null;
+  onAdaptiveRefresh?: () => void;
+  onSelectSkill?: (skillId: string) => void;
 }
 
 export function OutputsPanel({
@@ -125,6 +137,16 @@ export function OutputsPanel({
   onGenerateSlides,
   onGenerateMindmap,
   onGenerateSummary,
+  // Adaptive learning props
+  adaptiveRecommendations = [],
+  adaptiveProfileSummary = null,
+  adaptiveTotalZPDSkills = 0,
+  adaptiveMasteredCount = 0,
+  adaptiveHasProfile = false,
+  adaptiveLoading = false,
+  adaptiveError = null,
+  onAdaptiveRefresh,
+  onSelectSkill,
 }: OutputsPanelProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [expandedSection, setExpandedSection] = useState<ExpandedSection>(null);
@@ -292,6 +314,22 @@ export function OutputsPanel({
             </Link>
           </div>
         </section>
+      )}
+
+      {/* Adaptive Learning Recommendations - only shown when in a notebook context */}
+      {notebookId && onAdaptiveRefresh && (
+        <AdaptiveLearningSection
+          notebookId={notebookId}
+          recommendations={adaptiveRecommendations}
+          profileSummary={adaptiveProfileSummary}
+          totalZPDSkills={adaptiveTotalZPDSkills}
+          masteredCount={adaptiveMasteredCount}
+          hasProfile={adaptiveHasProfile}
+          loading={adaptiveLoading}
+          error={adaptiveError}
+          onRefresh={onAdaptiveRefresh}
+          onSelectSkill={onSelectSkill}
+        />
       )}
 
       {/* Audio Overview */}
