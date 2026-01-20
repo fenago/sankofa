@@ -203,23 +203,13 @@ export function ArtifactGenerator({
 
   const artifacts = artifactMap[toolId] || []
 
-  // Timer effect
+  // Timer effect - just tracks elapsed time, steps are set by API calls
   useEffect(() => {
     if (generating) {
       setElapsedSeconds(0)
-      setCurrentStep('refining')
 
       timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => {
-          const next = prev + 1
-          // Update step based on elapsed time
-          if (next >= 5 && next < 20) {
-            setCurrentStep('generating')
-          } else if (next >= 20) {
-            setCurrentStep('processing')
-          }
-          return next
-        })
+        setElapsedSeconds((prev) => prev + 1)
       }, 1000)
     } else {
       if (timerRef.current) {
@@ -249,9 +239,11 @@ export function ArtifactGenerator({
 
     setGenerating(artifactType.id)
     setShowPicker(false)
+    setCurrentStep('refining')
 
     try {
-      const response = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
+      // Step 1: Refine the prompt
+      const refineResponse = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -262,16 +254,45 @@ export function ArtifactGenerator({
           artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
           audience,
           toolId,
+          mode: 'refine',
+        }),
+      })
+
+      if (!refineResponse.ok) {
+        const error = await refineResponse.json()
+        throw new Error(error.error || 'Failed to refine prompt')
+      }
+
+      const refineData = await refineResponse.json()
+      const refinedPrompt = refineData.refinedPrompt
+
+      // Step 2: Generate the image with refined prompt
+      setCurrentStep('generating')
+
+      const generateResponse = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillName: skill.name,
+          skillDescription: skill.description,
+          artifactType: artifactType.name,
+          artifactId: artifactType.id,
+          artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
+          audience,
+          toolId,
+          mode: 'generate',
+          refinedPrompt,
           useHighQuality: true,
         }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
+      if (!generateResponse.ok) {
+        const error = await generateResponse.json()
         throw new Error(error.error || 'Failed to generate artifact')
       }
 
-      const data = await response.json()
+      setCurrentStep('processing')
+      const data = await generateResponse.json()
 
       setArtifact({
         type: artifactType.name,
@@ -614,22 +635,13 @@ export function QuickArtifactButtons({
   // Only show first 4 artifacts as quick buttons
   const quickArtifacts = artifacts.slice(0, 4)
 
-  // Timer effect
+  // Timer effect - just tracks elapsed time, steps are set by API calls
   useEffect(() => {
     if (generating) {
       setElapsedSeconds(0)
-      setCurrentStep('refining')
 
       timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => {
-          const next = prev + 1
-          if (next >= 5 && next < 20) {
-            setCurrentStep('generating')
-          } else if (next >= 20) {
-            setCurrentStep('processing')
-          }
-          return next
-        })
+        setElapsedSeconds((prev) => prev + 1)
       }, 1000)
     } else {
       if (timerRef.current) {
@@ -658,9 +670,11 @@ export function QuickArtifactButtons({
     }
 
     setGenerating(artifactType.id)
+    setCurrentStep('refining')
 
     try {
-      const response = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
+      // Step 1: Refine the prompt
+      const refineResponse = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -671,16 +685,45 @@ export function QuickArtifactButtons({
           artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
           audience,
           toolId,
+          mode: 'refine',
+        }),
+      })
+
+      if (!refineResponse.ok) {
+        const error = await refineResponse.json()
+        throw new Error(error.error || 'Failed to refine prompt')
+      }
+
+      const refineData = await refineResponse.json()
+      const refinedPrompt = refineData.refinedPrompt
+
+      // Step 2: Generate the image with refined prompt
+      setCurrentStep('generating')
+
+      const generateResponse = await fetch(`/api/notebooks/${notebookId}/artifacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillName: skill.name,
+          skillDescription: skill.description,
+          artifactType: artifactType.name,
+          artifactId: artifactType.id,
+          artifactPrompt: artifactType.promptTemplate(skill.name, skill.description),
+          audience,
+          toolId,
+          mode: 'generate',
+          refinedPrompt,
           useHighQuality: true,
         }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
+      if (!generateResponse.ok) {
+        const error = await generateResponse.json()
         throw new Error(error.error || 'Failed to generate artifact')
       }
 
-      const data = await response.json()
+      setCurrentStep('processing')
+      const data = await generateResponse.json()
 
       setArtifact({
         type: artifactType.name,
