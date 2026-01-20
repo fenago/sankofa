@@ -140,3 +140,52 @@ export async function runReadTransaction<T>(
     await session.close()
   }
 }
+
+// Track if indexes have been initialized
+let indexesInitialized = false
+
+/**
+ * Ensure Neo4J indexes exist for optimal query performance
+ * This should be called once at startup
+ */
+export async function ensureIndexes(): Promise<void> {
+  if (indexesInitialized) return
+
+  const session = getSession()
+  if (!session) return
+
+  try {
+    // Create indexes for frequently queried properties
+    // Using CREATE INDEX IF NOT EXISTS for idempotency
+    const indexQueries = [
+      // Skill indexes
+      'CREATE INDEX skill_id IF NOT EXISTS FOR (s:Skill) ON (s.id)',
+      'CREATE INDEX skill_notebook IF NOT EXISTS FOR (s:Skill) ON (s.notebookId)',
+      'CREATE INDEX skill_source IF NOT EXISTS FOR (s:Skill) ON (s.sourceDocumentId)',
+
+      // Entity indexes
+      'CREATE INDEX entity_id IF NOT EXISTS FOR (e:Entity) ON (e.id)',
+      'CREATE INDEX entity_notebook IF NOT EXISTS FOR (e:Entity) ON (e.notebookId)',
+      'CREATE INDEX entity_source IF NOT EXISTS FOR (e:Entity) ON (e.sourceDocumentId)',
+
+      // Composite indexes for common query patterns
+      'CREATE INDEX skill_notebook_bloom IF NOT EXISTS FOR (s:Skill) ON (s.notebookId, s.bloomLevel)',
+    ]
+
+    for (const query of indexQueries) {
+      try {
+        await session.run(query)
+      } catch (e) {
+        // Index might already exist with different name, that's ok
+        console.log(`[Neo4J] Index query note: ${(e as Error).message}`)
+      }
+    }
+
+    indexesInitialized = true
+    console.log('[Neo4J] Indexes ensured')
+  } catch (error) {
+    console.error('[Neo4J] Failed to ensure indexes:', error)
+  } finally {
+    await session.close()
+  }
+}

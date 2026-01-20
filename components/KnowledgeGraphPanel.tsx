@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -13,6 +13,9 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useGraph } from "@/hooks/useGraph";
+import { mutate } from "swr";
+import { notebookKeys } from "@/hooks/useNotebooks";
 
 interface Skill {
   id: string;
@@ -35,14 +38,6 @@ interface Prerequisite {
   fromSkillId: string;
   toSkillId: string;
   strength?: string;
-}
-
-interface GraphData {
-  available: boolean;
-  message?: string;
-  skills: Skill[];
-  entities: Entity[];
-  prerequisites: Prerequisite[];
 }
 
 interface KnowledgeGraphPanelProps {
@@ -71,43 +66,22 @@ const entityTypeColors: Record<string, string> = {
 };
 
 export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPanelProps) {
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Use SWR for cached graph data
+  const { skills, entities, prerequisites, loading, error: graphError, refetch } = useGraph(notebookId);
+
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities">("graph");
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const fetchGraphData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/graph`);
-      const data = await res.json();
-
-      console.log("[KnowledgeGraph] API response:", {
-        available: data.available,
-        skillCount: data.skills?.length,
-        entityCount: data.entities?.length,
-        sampleSkill: data.skills?.[0],
-      });
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch graph data");
-      }
-
-      setGraphData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [notebookId]);
+  // Combine errors
+  const error = extractionError || graphError;
 
   const triggerExtraction = useCallback(async () => {
     setIsExtracting(true);
+    setExtractionError(null);
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/graph`, {
         method: "POST",
@@ -120,29 +94,50 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
         throw new Error(data.error || data.message || "Extraction failed");
       }
 
-      // Refresh graph data
-      await fetchGraphData();
+      // Revalidate graph data and learning path
+      mutate(notebookKeys.graph(notebookId));
+      mutate(notebookKeys.learningPath(notebookId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setExtractionError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsExtracting(false);
     }
-  }, [notebookId, fetchGraphData]);
+  }, [notebookId]);
 
-  // Fetch data on mount
-  useEffect(() => {
-    fetchGraphData();
-  }, [fetchGraphData]);
+  // Build graphData object for compatibility - memoize to prevent infinite loops
+  const graphData = useMemo(() => ({
+    available: true,
+    skills: skills as Skill[],
+    entities: entities as Entity[],
+    prerequisites: prerequisites.map(p => ({
+      fromSkillId: p.source,
+      toSkillId: p.target,
+      strength: p.type,
+    })) as Prerequisite[],
+  }), [skills, entities, prerequisites]);
+
+  // Track previous data to prevent unnecessary updates
+  const prevDataKeyRef = useRef<string>("");
 
   // Convert graph data to React Flow nodes/edges
   useEffect(() => {
-    if (!graphData || graphData.skills.length === 0) {
+    // Create a stable key from the data to detect actual changes
+    const dataKey = JSON.stringify({
+      skillIds: graphData.skills.map(s => s.id),
+      prereqKeys: graphData.prerequisites.map(p => `${p.fromSkillId}-${p.toSkillId}`),
+    });
+
+    // Skip if data hasn't actually changed
+    if (dataKey === prevDataKeyRef.current) {
+      return;
+    }
+    prevDataKeyRef.current = dataKey;
+
+    if (graphData.skills.length === 0) {
       setNodes([]);
       setEdges([]);
       return;
     }
-
-    console.log("[KnowledgeGraph] Processing skills:", graphData.skills.slice(0, 3));
 
     // Create nodes from skills
     const skillNodes: Node[] = graphData.skills.map((skill, index) => {
@@ -196,10 +191,10 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
     setEdges(prereqEdges);
   }, [graphData, setNodes, setEdges]);
 
-  const skillCount = graphData?.skills?.length || 0;
-  const entityCount = graphData?.entities?.length || 0;
+  const skillCount = skills.length;
+  const entityCount = entities.length;
 
-  if (loading && !graphData) {
+  if (loading && skillCount === 0) {
     return (
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
@@ -210,24 +205,6 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
         </div>
         <div className="h-64 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-        </div>
-      </div>
-    );
-  }
-
-  if (graphData && !graphData.available) {
-    return (
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-black flex items-center gap-2">
-            <Network className="h-5 w-5" />
-            Knowledge Graph
-          </h3>
-        </div>
-        <div className="h-32 flex flex-col items-center justify-center text-gray-500 bg-white rounded border border-dashed border-gray-300">
-          <AlertCircle className="h-8 w-8 mb-2 text-gray-400" />
-          <p className="text-sm">{graphData.message || "Knowledge graph not available"}</p>
-          <p className="text-xs text-gray-400 mt-1">Neo4J connection required for this feature</p>
         </div>
       </div>
     );
@@ -249,7 +226,7 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
           <Button
             size="sm"
             variant="ghost"
-            onClick={fetchGraphData}
+            onClick={() => refetch()}
             disabled={loading}
             className="text-xs h-8"
             title="Refresh"

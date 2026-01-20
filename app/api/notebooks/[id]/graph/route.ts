@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isNeo4JAvailable } from '@/lib/graph/neo4j'
+import { isNeo4JAvailable, ensureIndexes } from '@/lib/graph/neo4j'
 import { getSkillGraph, getEntitiesByNotebook, storeGraphExtraction, deleteNotebookGraph } from '@/lib/graph/store'
 import { extractFromText, batchExtractFromTexts } from '@/lib/pipeline/extraction'
 
@@ -41,6 +41,9 @@ export async function GET(request: Request, { params }: RouteParams) {
         entities: [],
       })
     }
+
+    // Ensure indexes exist (idempotent, runs once per server lifetime)
+    await ensureIndexes()
 
     // Get skills with prerequisites
     const skillGraph = await getSkillGraph(notebookId)

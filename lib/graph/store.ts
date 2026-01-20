@@ -312,37 +312,49 @@ export async function getRelatedEntities(entityId: string): Promise<{
 
 /**
  * Get the skill graph for a notebook (skills + prerequisites)
+ * Optimized to use a single query with COLLECT
  */
 export async function getSkillGraph(notebookId: string): Promise<{
   skills: SkillNode[]
   prerequisites: PrerequisiteRelationship[]
 }> {
-  const skillsResult = await runQuery<{ s: Neo4JNode<SkillNode> | SkillNode }>(
-    `
-    MATCH (s:Skill {notebookId: $notebookId})
-    RETURN s
-    `,
-    { notebookId }
-  )
-
-  const prereqsResult = await runQuery<{
-    fromId: string
-    toId: string
-    r: Neo4JNode<Omit<PrerequisiteRelationship, 'fromSkillId' | 'toSkillId'>> | Omit<PrerequisiteRelationship, 'fromSkillId' | 'toSkillId'>
+  // Single query that returns both skills and prerequisites
+  const result = await runQuery<{
+    skills: (Neo4JNode<SkillNode> | SkillNode)[]
+    prerequisites: { fromId: string; toId: string; strength: string; confidenceScore: number; reasoning?: string; inferenceMethod?: string }[]
   }>(
     `
-    MATCH (from:Skill {notebookId: $notebookId})-[r:PREREQUISITE_OF]->(to:Skill {notebookId: $notebookId})
-    RETURN from.id as fromId, to.id as toId, r
+    MATCH (s:Skill {notebookId: $notebookId})
+    WITH collect(s) as skills
+    OPTIONAL MATCH (from:Skill {notebookId: $notebookId})-[r:PREREQUISITE_OF]->(to:Skill {notebookId: $notebookId})
+    WITH skills, collect({
+      fromId: from.id,
+      toId: to.id,
+      strength: r.strength,
+      confidenceScore: r.confidenceScore,
+      reasoning: r.reasoning,
+      inferenceMethod: r.inferenceMethod
+    }) as prerequisites
+    RETURN skills, [p IN prerequisites WHERE p.fromId IS NOT NULL] as prerequisites
     `,
     { notebookId }
   )
 
+  if (result.length === 0) {
+    return { skills: [], prerequisites: [] }
+  }
+
+  const { skills, prerequisites } = result[0]
+
   return {
-    skills: skillsResult.map(r => extractProperties(r.s)),
-    prerequisites: prereqsResult.map(r => ({
-      ...extractProperties(r.r),
-      fromSkillId: r.fromId,
-      toSkillId: r.toId,
+    skills: skills.map(s => extractProperties(s)),
+    prerequisites: prerequisites.map(p => ({
+      fromSkillId: p.fromId,
+      toSkillId: p.toId,
+      strength: p.strength as PrerequisiteRelationship['strength'],
+      confidenceScore: p.confidenceScore,
+      reasoning: p.reasoning,
+      inferenceMethod: p.inferenceMethod as PrerequisiteRelationship['inferenceMethod'],
     })),
   }
 }
@@ -444,6 +456,7 @@ export async function cleanupOrphanedNodes(): Promise<{ skills: number; entities
 
 /**
  * Get graph statistics for a notebook
+ * Optimized using UNION ALL for parallel counting
  */
 export async function getGraphStats(notebookId: string): Promise<{
   skillCount: number
@@ -451,6 +464,7 @@ export async function getGraphStats(notebookId: string): Promise<{
   prerequisiteCount: number
   entityRelationshipCount: number
 }> {
+  // Use CALL subqueries for efficient parallel counting
   const results = await runQuery<{
     skillCount: number
     entityCount: number
@@ -458,14 +472,23 @@ export async function getGraphStats(notebookId: string): Promise<{
     entityRelationshipCount: number
   }>(
     `
-    MATCH (s:Skill {notebookId: $notebookId})
-    WITH count(s) as skillCount
-    MATCH (e:Entity {notebookId: $notebookId})
-    WITH skillCount, count(e) as entityCount
-    OPTIONAL MATCH (s1:Skill {notebookId: $notebookId})-[p:PREREQUISITE_OF]->(s2:Skill {notebookId: $notebookId})
-    WITH skillCount, entityCount, count(p) as prerequisiteCount
-    OPTIONAL MATCH (e1:Entity {notebookId: $notebookId})-[r:RELATES_TO]->(e2:Entity {notebookId: $notebookId})
-    RETURN skillCount, entityCount, prerequisiteCount, count(r) as entityRelationshipCount
+    CALL {
+      MATCH (s:Skill {notebookId: $notebookId})
+      RETURN count(s) as skillCount
+    }
+    CALL {
+      MATCH (e:Entity {notebookId: $notebookId})
+      RETURN count(e) as entityCount
+    }
+    CALL {
+      MATCH (:Skill {notebookId: $notebookId})-[p:PREREQUISITE_OF]->(:Skill {notebookId: $notebookId})
+      RETURN count(p) as prerequisiteCount
+    }
+    CALL {
+      MATCH (:Entity {notebookId: $notebookId})-[r:RELATES_TO]->(:Entity {notebookId: $notebookId})
+      RETURN count(r) as entityRelationshipCount
+    }
+    RETURN skillCount, entityCount, prerequisiteCount, entityRelationshipCount
     `,
     { notebookId }
   )
@@ -475,19 +498,18 @@ export async function getGraphStats(notebookId: string): Promise<{
   }
 
   const row = results[0]
+  const toNum = (val: unknown): number => {
+    if (typeof val === 'object' && val !== null && 'toNumber' in val) {
+      return (val as { toNumber: () => number }).toNumber()
+    }
+    return Number(val) || 0
+  }
+
   return {
-    skillCount: typeof row.skillCount === 'object' && 'toNumber' in row.skillCount
-      ? (row.skillCount as { toNumber: () => number }).toNumber()
-      : Number(row.skillCount) || 0,
-    entityCount: typeof row.entityCount === 'object' && 'toNumber' in row.entityCount
-      ? (row.entityCount as { toNumber: () => number }).toNumber()
-      : Number(row.entityCount) || 0,
-    prerequisiteCount: typeof row.prerequisiteCount === 'object' && 'toNumber' in row.prerequisiteCount
-      ? (row.prerequisiteCount as { toNumber: () => number }).toNumber()
-      : Number(row.prerequisiteCount) || 0,
-    entityRelationshipCount: typeof row.entityRelationshipCount === 'object' && 'toNumber' in row.entityRelationshipCount
-      ? (row.entityRelationshipCount as { toNumber: () => number }).toNumber()
-      : Number(row.entityRelationshipCount) || 0,
+    skillCount: toNum(row.skillCount),
+    entityCount: toNum(row.entityCount),
+    prerequisiteCount: toNum(row.prerequisiteCount),
+    entityRelationshipCount: toNum(row.entityRelationshipCount),
   }
 }
 
