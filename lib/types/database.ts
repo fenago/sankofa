@@ -249,6 +249,147 @@ export type Database = {
         }
         Relationships: []
       }
+      learner_interactions: {
+        Row: {
+          id: string
+          notebook_id: string
+          learner_id: string
+          skill_id: string | null
+          event_type: string
+          session_id: string
+          created_at: string
+          session_duration_ms: number | null
+          time_since_last_ms: number | null
+          payload: Json
+          context: Json
+        }
+        Insert: {
+          id?: string
+          notebook_id: string
+          learner_id: string
+          skill_id?: string | null
+          event_type: string
+          session_id: string
+          created_at?: string
+          session_duration_ms?: number | null
+          time_since_last_ms?: number | null
+          payload?: Json
+          context?: Json
+        }
+        Update: {
+          id?: string
+          notebook_id?: string
+          learner_id?: string
+          skill_id?: string | null
+          event_type?: string
+          session_id?: string
+          created_at?: string
+          session_duration_ms?: number | null
+          time_since_last_ms?: number | null
+          payload?: Json
+          context?: Json
+        }
+        Relationships: []
+      }
+      learner_sessions: {
+        Row: {
+          id: string
+          notebook_id: string
+          learner_id: string
+          started_at: string
+          ended_at: string | null
+          duration_ms: number | null
+          total_interactions: number
+          practice_attempts: number
+          correct_attempts: number
+          hints_requested: number
+          skills_practiced: string[]
+          ending_mastery_snapshot: Json | null
+          device_type: string | null
+          user_agent: string | null
+          status: 'active' | 'ended' | 'abandoned'
+        }
+        Insert: {
+          id?: string
+          notebook_id: string
+          learner_id: string
+          started_at?: string
+          ended_at?: string | null
+          duration_ms?: number | null
+          total_interactions?: number
+          practice_attempts?: number
+          correct_attempts?: number
+          hints_requested?: number
+          skills_practiced?: string[]
+          ending_mastery_snapshot?: Json | null
+          device_type?: string | null
+          user_agent?: string | null
+          status?: 'active' | 'ended' | 'abandoned'
+        }
+        Update: {
+          id?: string
+          notebook_id?: string
+          learner_id?: string
+          started_at?: string
+          ended_at?: string | null
+          duration_ms?: number | null
+          total_interactions?: number
+          practice_attempts?: number
+          correct_attempts?: number
+          hints_requested?: number
+          skills_practiced?: string[]
+          ending_mastery_snapshot?: Json | null
+          device_type?: string | null
+          user_agent?: string | null
+          status?: 'active' | 'ended' | 'abandoned'
+        }
+        Relationships: []
+      }
+      inverse_profiles: {
+        Row: {
+          id: string
+          learner_id: string
+          notebook_id: string
+          version: number
+          computed_at: string
+          interactions_analyzed: number
+          knowledge_state: Json
+          cognitive_indicators: Json
+          metacognitive_indicators: Json
+          motivational_indicators: Json
+          behavioral_patterns: Json
+          confidence_scores: Json
+        }
+        Insert: {
+          id?: string
+          learner_id: string
+          notebook_id: string
+          version?: number
+          computed_at?: string
+          interactions_analyzed?: number
+          knowledge_state?: Json
+          cognitive_indicators?: Json
+          metacognitive_indicators?: Json
+          motivational_indicators?: Json
+          behavioral_patterns?: Json
+          confidence_scores?: Json
+        }
+        Update: {
+          id?: string
+          learner_id?: string
+          notebook_id?: string
+          version?: number
+          computed_at?: string
+          interactions_analyzed?: number
+          knowledge_state?: Json
+          cognitive_indicators?: Json
+          metacognitive_indicators?: Json
+          motivational_indicators?: Json
+          behavioral_patterns?: Json
+          confidence_scores?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -269,10 +410,43 @@ export type Database = {
           similarity: number
         }[]
       }
+      get_active_session: {
+        Args: {
+          p_learner_id: string
+          p_notebook_id: string
+        }
+        Returns: string | null
+      }
+      get_interaction_summary: {
+        Args: {
+          p_learner_id: string
+          p_notebook_id: string
+          p_since?: string
+        }
+        Returns: {
+          event_type: string
+          event_count: number
+        }[]
+      }
+      get_practice_stats: {
+        Args: {
+          p_learner_id: string
+          p_notebook_id: string
+          p_skill_id?: string
+        }
+        Returns: {
+          total_attempts: number
+          correct_attempts: number
+          accuracy: number
+          avg_response_time_ms: number
+          hints_used: number
+        }[]
+      }
     }
     Enums: {
       source_type: 'url' | 'pdf' | 'txt'
       source_status: 'pending' | 'processing' | 'success' | 'error'
+      session_status: 'active' | 'ended' | 'abandoned'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -295,6 +469,13 @@ export type ChunkInsert = Database['public']['Tables']['chunks']['Insert']
 export type MessageInsert = Database['public']['Tables']['messages']['Insert']
 export type ArtifactInsert = Database['public']['Tables']['artifacts']['Insert']
 export type PromptOverrideInsert = Database['public']['Tables']['prompt_overrides']['Insert']
+export type LearnerInteractionRow = Database['public']['Tables']['learner_interactions']['Row']
+export type LearnerInteractionInsert = Database['public']['Tables']['learner_interactions']['Insert']
+export type LearnerSessionRow = Database['public']['Tables']['learner_sessions']['Row']
+export type LearnerSessionInsert = Database['public']['Tables']['learner_sessions']['Insert']
+export type InverseProfileRow = Database['public']['Tables']['inverse_profiles']['Row']
+export type InverseProfileInsert = Database['public']['Tables']['inverse_profiles']['Insert']
 
 export type SourceType = Database['public']['Enums']['source_type']
 export type SourceStatus = Database['public']['Enums']['source_status']
+export type SessionStatus = Database['public']['Enums']['session_status']

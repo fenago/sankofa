@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { ArrowLeft, Loader2, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNotebook } from '@/hooks/useNotebooks'
+import { useSources, invalidateSources } from '@/hooks/useSources'
 import { useToast } from '@/hooks/use-toast'
 import { Navbar } from '@/components/Navbar'
 import { SourcesPanel } from '@/components/SourcesPanel'
 import { ChatInterface } from '@/components/ChatInterface'
 import { OutputsPanel } from '@/components/OutputsPanel'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { SessionProvider } from '@/components/providers/SessionProvider'
 import { Source, Message, ResponseLength } from '@/lib/types'
 import { CustomPrompts, getStoredPrompts } from '@/lib/prompts'
 
@@ -21,10 +23,10 @@ interface NotebookPageProps {
 export default function NotebookPage({ params }: NotebookPageProps) {
   const { id: notebookId } = use(params)
   const { notebook, loading: notebookLoading, error: notebookError } = useNotebook(notebookId)
+  const { sources, loading: sourcesLoading, refreshSources } = useSources(notebookId)
   const { toast } = useToast()
 
   // State (similar to home page)
-  const [sources, setSources] = useState<Source[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [summary, setSummary] = useState<string | null>(null)
   const [slides, setSlides] = useState<any[]>([])
@@ -49,45 +51,10 @@ export default function NotebookPage({ params }: NotebookPageProps) {
   // Mobile tab state
   const [mobileTab, setMobileTab] = useState<'sources' | 'chat' | 'outputs'>('sources')
 
-  // Load custom prompts and sources on mount
+  // Load custom prompts on mount
   useEffect(() => {
     setCustomPrompts(getStoredPrompts())
   }, [])
-
-  // Load sources from Supabase when notebook changes
-  useEffect(() => {
-    if (notebookId) {
-      loadSources()
-    }
-  }, [notebookId])
-
-  const loadSources = async () => {
-    try {
-      console.log('[LoadSources] Fetching sources for notebook:', notebookId)
-      const res = await fetch(`/api/notebooks/${notebookId}/sources`)
-      const data = await res.json()
-      console.log('[LoadSources] Response:', res.status, data)
-
-      if (res.ok && data.sources) {
-        // Transform database sources to UI sources format
-        const uiSources: Source[] = data.sources.map((s: any) => ({
-          id: s.id,
-          url: s.url || s.filename,
-          title: s.title || s.filename,
-          status: s.status === 'success' ? 'success' : s.status === 'error' ? 'error' : 'loading',
-          text: s.raw_text,
-          addedAt: new Date(s.created_at).getTime(),
-          error: s.error_message,
-        }))
-        console.log('[LoadSources] Loaded', uiSources.length, 'sources')
-        setSources(uiSources)
-      } else {
-        console.error('[LoadSources] Failed:', data.error || 'Unknown error')
-      }
-    } catch (error) {
-      console.error('[LoadSources] Exception:', error)
-    }
-  }
 
   const generateSummary = async (currentSources: Source[]) => {
     const context = currentSources
@@ -135,15 +102,6 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
   const handleAddUrl = async (url: string) => {
     setIsScraping(true)
-    const tempId = `source-${Date.now()}`
-    const newSource: Source = {
-      id: tempId,
-      url,
-      status: 'loading',
-      addedAt: Date.now(),
-    }
-
-    setSources((prev) => [...prev, newSource])
 
     try {
       const res = await fetch('/api/scrape', {
@@ -156,23 +114,11 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
       if (!res.ok) throw new Error(data.error || 'Failed to scrape')
 
-      const updatedSource = {
-        ...newSource,
-        id: data.sourceId || tempId,
-        status: 'success' as const,
-        title: data.title,
-        content: data.content,
-        text: data.text,
-      }
-
-      setSources((prev) => prev.map((s) => (s.id === tempId ? updatedSource : s)))
-
+      // Refresh sources from server to get the new source
+      invalidateSources(notebookId)
       toast({ title: 'Source added successfully' })
     } catch (error) {
       console.error(error)
-      setSources((prev) =>
-        prev.map((s) => (s.id === tempId ? { ...s, status: 'error', error: 'Failed to load' } : s))
-      )
       toast({
         title: 'Failed to add source',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -185,17 +131,6 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
   const handleAddFile = async (file: File) => {
     setIsScraping(true)
-    const tempId = `file-${Date.now()}`
-
-    const newSource: Source = {
-      id: tempId,
-      url: file.name,
-      title: file.name,
-      status: 'loading',
-      addedAt: Date.now(),
-    }
-
-    setSources((prev) => [...prev, newSource])
 
     try {
       const formData = new FormData()
@@ -211,23 +146,11 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
       if (!res.ok) throw new Error(data.error || 'Failed to upload PDF')
 
-      const updatedSource = {
-        ...newSource,
-        id: data.sourceId || tempId,
-        status: 'success' as const,
-        title: data.title || file.name,
-        text: data.text,
-        content: data.content,
-      }
-
-      setSources((prev) => prev.map((s) => (s.id === tempId ? updatedSource : s)))
-
+      // Refresh sources from server to get the new source
+      invalidateSources(notebookId)
       toast({ title: 'PDF added successfully' })
     } catch (error) {
       console.error(error)
-      setSources((prev) =>
-        prev.map((s) => (s.id === tempId ? { ...s, status: 'error', error: 'Failed to process PDF' } : s))
-      )
       toast({
         title: 'Failed to add PDF',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -239,25 +162,22 @@ export default function NotebookPage({ params }: NotebookPageProps) {
   }
 
   const handleRemoveSource = async (id: string) => {
-    // Optimistically remove from UI
-    setSources((prev) => prev.filter((s) => s.id !== id))
-
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/sources/${id}`, {
         method: 'DELETE',
       })
 
       if (!res.ok) {
-        // Reload sources if delete failed
-        loadSources()
         toast({
           title: 'Failed to delete source',
           variant: 'destructive',
         })
+        return
       }
+
+      // Refresh sources after successful delete
+      invalidateSources(notebookId)
     } catch (error) {
-      // Reload sources if delete failed
-      loadSources()
       toast({
         title: 'Failed to delete source',
         variant: 'destructive',
@@ -500,6 +420,7 @@ export default function NotebookPage({ params }: NotebookPageProps) {
   }
 
   return (
+    <SessionProvider notebookId={notebookId} autoStart={true}>
     <div className="flex flex-col h-[calc(100vh-88px)] bg-white text-black font-sans overflow-hidden -mx-4 -my-6">
       {/* Notebook Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">
@@ -626,5 +547,6 @@ export default function NotebookPage({ params }: NotebookPageProps) {
         </div>
       </div>
     </div>
+    </SessionProvider>
   )
 }
