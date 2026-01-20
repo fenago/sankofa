@@ -391,6 +391,10 @@ export type Database = {
           motivational_indicators: Json
           behavioral_patterns: Json
           confidence_scores: Json
+          data_quality: 'insufficient' | 'limited' | 'adequate' | 'good'
+          warnings: string[]
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -405,6 +409,10 @@ export type Database = {
           motivational_indicators?: Json
           behavioral_patterns?: Json
           confidence_scores?: Json
+          data_quality?: 'insufficient' | 'limited' | 'adequate' | 'good'
+          warnings?: string[]
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -419,6 +427,10 @@ export type Database = {
           motivational_indicators?: Json
           behavioral_patterns?: Json
           confidence_scores?: Json
+          data_quality?: 'insufficient' | 'limited' | 'adequate' | 'good'
+          warnings?: string[]
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

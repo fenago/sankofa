@@ -1,38 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import useSWR, { mutate } from 'swr'
+import { fetcher } from '@/lib/swr-config'
 import type { Notebook } from '@/lib/types/database'
 
-interface UseNotebooksOptions {
-  autoFetch?: boolean
+// SWR key factories
+export const notebookKeys = {
+  all: '/api/notebooks' as const,
+  one: (id: string) => `/api/notebooks/${id}` as const,
+  sources: (id: string) => `/api/notebooks/${id}/sources` as const,
+  graph: (id: string) => `/api/notebooks/${id}/graph` as const,
+  learningPath: (id: string, action: string = 'overview') =>
+    `/api/notebooks/${id}/graph/learning-path?action=${action}` as const,
+  artifacts: (id: string, audience?: string) =>
+    audience ? `/api/notebooks/${id}/artifacts/library?audience=${audience}` : `/api/notebooks/${id}/artifacts/library` as const,
 }
 
-export function useNotebooks(options: UseNotebooksOptions = { autoFetch: true }) {
-  const [notebooks, setNotebooks] = useState<Notebook[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function useNotebooks() {
+  const { data, error, isLoading, mutate: revalidate } = useSWR<{ notebooks: Notebook[] }>(
+    notebookKeys.all,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
 
-  const fetchNotebooks = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/notebooks')
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch notebooks')
-      }
-
-      setNotebooks(data.notebooks)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const createNotebook = useCallback(async (
+  const createNotebook = async (
     name: string,
     description?: string,
     color?: string
@@ -44,21 +35,22 @@ export function useNotebooks(options: UseNotebooksOptions = { autoFetch: true })
         body: JSON.stringify({ name, description, color }),
       })
 
-      const data = await res.json()
+      const responseData = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create notebook')
+        throw new Error(responseData.error || 'Failed to create notebook')
       }
 
-      setNotebooks(prev => [data.notebook, ...prev])
-      return data.notebook
+      // Optimistically update the cache
+      revalidate()
+      return responseData.notebook
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
+      console.error('Failed to create notebook:', e)
       return null
     }
-  }, [])
+  }
 
-  const updateNotebook = useCallback(async (
+  const updateNotebook = async (
     id: string,
     updates: { name?: string; description?: string; color?: string }
   ): Promise<Notebook | null> => {
@@ -69,97 +61,69 @@ export function useNotebooks(options: UseNotebooksOptions = { autoFetch: true })
         body: JSON.stringify(updates),
       })
 
-      const data = await res.json()
+      const responseData = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to update notebook')
+        throw new Error(responseData.error || 'Failed to update notebook')
       }
 
-      setNotebooks(prev =>
-        prev.map(n => n.id === id ? data.notebook : n)
-      )
-      return data.notebook
+      // Revalidate both list and individual notebook
+      revalidate()
+      mutate(notebookKeys.one(id))
+      return responseData.notebook
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
+      console.error('Failed to update notebook:', e)
       return null
     }
-  }, [])
+  }
 
-  const deleteNotebook = useCallback(async (id: string): Promise<boolean> => {
+  const deleteNotebook = async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/notebooks/${id}`, {
         method: 'DELETE',
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to delete notebook')
+        const responseData = await res.json()
+        throw new Error(responseData.error || 'Failed to delete notebook')
       }
 
-      setNotebooks(prev => prev.filter(n => n.id !== id))
+      // Revalidate the list
+      revalidate()
       return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
+      console.error('Failed to delete notebook:', e)
       return false
     }
-  }, [])
-
-  useEffect(() => {
-    if (options.autoFetch) {
-      fetchNotebooks()
-    }
-  }, [options.autoFetch, fetchNotebooks])
+  }
 
   return {
-    notebooks,
-    loading,
-    error,
-    fetchNotebooks,
+    notebooks: data?.notebooks ?? [],
+    loading: isLoading,
+    error: error?.message ?? null,
+    fetchNotebooks: revalidate,
     createNotebook,
     updateNotebook,
     deleteNotebook,
   }
 }
 
-// Hook for a single notebook
+// Hook for a single notebook with stats
 export function useNotebook(id: string) {
-  const [notebook, setNotebook] = useState<Notebook | null>(null)
-  const [stats, setStats] = useState<{ sourceCount: number; messageCount: number } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchNotebook = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const res = await fetch(`/api/notebooks/${id}`)
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch notebook')
-      }
-
-      setNotebook(data.notebook)
-      setStats(data.stats)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
-
-  useEffect(() => {
-    if (id) {
-      fetchNotebook()
-    }
-  }, [id, fetchNotebook])
+  const { data, error, isLoading, mutate: revalidate } = useSWR<{
+    notebook: Notebook
+    stats: { sourceCount: number; messageCount: number }
+  }>(
+    id ? notebookKeys.one(id) : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
 
   return {
-    notebook,
-    stats,
-    loading,
-    error,
-    refetch: fetchNotebook,
+    notebook: data?.notebook ?? null,
+    stats: data?.stats ?? null,
+    loading: isLoading,
+    error: error?.message ?? null,
+    refetch: revalidate,
   }
 }
