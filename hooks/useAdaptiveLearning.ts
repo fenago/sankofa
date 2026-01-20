@@ -18,6 +18,13 @@ export const adaptiveKeys = {
 }
 
 // Types for API responses
+export interface RecommendationReason {
+  factor: string
+  weight: number
+  description: string
+  profileDimension: 'knowledge' | 'cognitive' | 'metacognitive' | 'motivational' | 'behavioral'
+}
+
 export interface SkillRecommendation {
   skillId: string
   skill: {
@@ -31,7 +38,7 @@ export interface SkillRecommendation {
     cognitiveLoadEstimate?: number
   }
   score: number
-  reasons: string[]
+  reasons: RecommendationReason[]
   adjustments: {
     scaffoldLevel: 1 | 2 | 3 | 4
     difficultyAdjustment: number

@@ -18,7 +18,7 @@ import {
   BookOpen,
   Star,
 } from 'lucide-react'
-import type { SkillRecommendation } from '@/hooks/useAdaptiveLearning'
+import type { SkillRecommendation, RecommendationReason } from '@/hooks/useAdaptiveLearning'
 import { getBloomLabel, getScaffoldDescription } from '@/hooks/useAdaptiveLearning'
 
 interface RecommendationCardProps {
@@ -127,7 +127,7 @@ export function RecommendationCard({
                     {reasons.map((reason, idx) => (
                       <li key={idx} className="flex items-start gap-1.5">
                         <span className="text-green-500 mt-0.5">✓</span>
-                        {reason}
+                        {reason.description}
                       </li>
                     ))}
                   </ul>

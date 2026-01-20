@@ -22,6 +22,11 @@ import { SkillNode, type SkillNodeData } from './SkillNode'
 import { PathControls, type LayoutType, type FilterType } from './PathControls'
 import { SkillSidebar } from './SkillSidebar'
 
+// Define nodeTypes outside component to prevent React Flow warning
+const nodeTypes: NodeTypes = {
+  skillNode: SkillNode,
+}
+
 interface PathSkill {
   skillId: string
   name: string
@@ -239,14 +244,6 @@ export function PathVisualization({
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
   }, [initialNodes, initialEdges, layout, setNodes, setEdges])
-
-  // Node types (memoized to prevent React Flow warning)
-  const nodeTypes = useMemo(
-    () => ({
-      skillNode: SkillNode,
-    }) as NodeTypes,
-    []
-  )
 
   // Handle node click
   const onNodeClick = useCallback(
