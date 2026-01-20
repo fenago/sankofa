@@ -36,6 +36,13 @@ export function useSources(notebookId: string | null) {
     {
       revalidateOnFocus: false,
       dedupingInterval: 2000,
+      // Poll every 2 seconds while any source is processing
+      refreshInterval: (latestData) => {
+        const hasProcessing = latestData?.sources?.some(
+          s => s.status === 'pending' || s.status === 'processing'
+        )
+        return hasProcessing ? 2000 : 0
+      },
     }
   )
 
