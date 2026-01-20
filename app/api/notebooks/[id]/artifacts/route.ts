@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 // Force dynamic to prevent caching
 export const dynamic = 'force-dynamic';
 
+// Increase max duration for serverless (Netlify Pro: 26s, Vercel: 60s)
+export const maxDuration = 60;
+
 // Model configuration
 const TEXT_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview";
@@ -22,13 +25,24 @@ interface ArtifactRequest {
   audience: 'student' | 'teacher' | 'curriculum'
   toolId: string
   useHighQuality?: boolean // Use Pro image model if true
+  refinePrompt?: boolean // Whether to use text model to refine prompt first (default: false for speed)
+}
+
+// Helper to log with timestamps
+function logWithTime(startTime: number, message: string) {
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`[Artifacts +${elapsed}s] ${message}`);
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const startTime = Date.now();
+
   try {
+    logWithTime(startTime, "Starting artifact generation...");
+
     const { id: notebookId } = await params;
     const body: ArtifactRequest = await request.json();
 
@@ -40,11 +54,15 @@ export async function POST(
       artifactPrompt,
       audience,
       toolId,
-      useHighQuality = true, // Default to high quality
+      useHighQuality = true,
+      refinePrompt = false, // Default to false to save ~3-5 seconds
     } = body;
+
+    logWithTime(startTime, `Request: ${artifactType} for "${skillName}" (refinePrompt=${refinePrompt})`);
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      logWithTime(startTime, "ERROR: Gemini API key is missing");
       return NextResponse.json(
         { error: "Gemini API key is missing" },
         { status: 500 }
@@ -57,6 +75,7 @@ export async function POST(
 
     if (artifactId) {
       try {
+        logWithTime(startTime, "Checking for custom prompt override...");
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -72,27 +91,31 @@ export async function POST(
             .single();
 
           if (override?.custom_prompt && override.is_active !== false) {
-            // Replace placeholders in custom prompt
             finalPrompt = override.custom_prompt
               .replace(/\{skillName\}/g, skillName)
               .replace(/\{skillDescription\}/g, skillDescription || '');
             usingCustomPrompt = true;
-            console.log(`[Artifacts] Using custom prompt for ${audience}/${toolId}/${artifactId}`);
+            logWithTime(startTime, `Using custom prompt for ${audience}/${toolId}/${artifactId}`);
           }
         }
+        logWithTime(startTime, "Custom prompt check complete");
       } catch (error) {
-        // Silently fall back to default prompt if override lookup fails
-        console.warn(`[Artifacts] Failed to check for custom prompt:`, error);
+        logWithTime(startTime, `Custom prompt check failed (using default): ${error}`);
       }
     }
 
     const ai = new GoogleGenAI({ apiKey });
+    const selectedImageModel = useHighQuality ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK;
 
-    console.log(`[Artifacts] Generating ${artifactType} for "${skillName}" (${audience}/${toolId})${usingCustomPrompt ? ' [custom prompt]' : ''}`);
-    console.log(`[Artifacts] Using text model: ${TEXT_MODEL}, image model: ${useHighQuality ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK}`);
+    logWithTime(startTime, `Using image model: ${selectedImageModel}`);
 
-    // Step 1: Use text model to refine the prompt for better image generation
-    const promptRefinementRequest = `You are an expert at creating prompts for AI image generation, specifically for educational illustrations.
+    let promptForImage = finalPrompt;
+
+    // Optional: Refine prompt with text model (adds ~3-5 seconds)
+    if (refinePrompt) {
+      logWithTime(startTime, "Refining prompt with text model...");
+
+      const promptRefinementRequest = `You are an expert at creating prompts for AI image generation, specifically for educational illustrations.
 
 Given this request to create a visual artifact:
 
@@ -113,35 +136,35 @@ Create an OPTIMIZED IMAGE GENERATION PROMPT that will produce a high-quality edu
 
 Return ONLY the optimized prompt, nothing else. Make it detailed and specific for image generation.`;
 
-    let refinedPrompt: string;
-
-    try {
-      const textResponse = await ai.models.generateContent({
-        model: TEXT_MODEL,
-        contents: [{ role: "user", parts: [{ text: promptRefinementRequest }] }],
-      });
-
-      refinedPrompt = textResponse.text || artifactPrompt;
-    } catch (textError) {
-      console.warn(`[Artifacts] Text model ${TEXT_MODEL} failed, trying fallback:`, textError);
-
-      // Try fallback text model
       try {
         const textResponse = await ai.models.generateContent({
-          model: TEXT_MODEL_FALLBACK,
+          model: TEXT_MODEL,
           contents: [{ role: "user", parts: [{ text: promptRefinementRequest }] }],
         });
-        refinedPrompt = textResponse.text || artifactPrompt;
-      } catch (fallbackError) {
-        console.warn(`[Artifacts] Fallback text model also failed, using original prompt`);
-        refinedPrompt = artifactPrompt;
+        promptForImage = textResponse.text || finalPrompt;
+        logWithTime(startTime, `Prompt refined (${promptForImage.length} chars)`);
+      } catch (textError) {
+        logWithTime(startTime, `Text model failed, using original prompt: ${textError}`);
+        promptForImage = finalPrompt;
       }
+    } else {
+      // Build a good prompt directly without the extra API call
+      promptForImage = `Create a high-quality educational illustration for ${audience}s:
+
+**Type:** ${artifactType}
+**Topic:** ${skillName}
+${skillDescription ? `**Context:** ${skillDescription}` : ''}
+
+**Requirements:**
+${finalPrompt}
+
+Style: Clean, professional, educational. Use clear typography, good contrast, and organized layout. Make it visually engaging and easy to understand.`;
+
+      logWithTime(startTime, "Using direct prompt (skipping refinement for speed)");
     }
 
-    console.log(`[Artifacts] Refined prompt length: ${refinedPrompt.length} chars`);
-
-    // Step 2: Generate the image using the image model
-    const selectedImageModel = useHighQuality ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK;
+    // Generate the image
+    logWithTime(startTime, "Starting image generation...");
 
     let imageResponse;
     let usedModel = selectedImageModel;
@@ -149,26 +172,27 @@ Return ONLY the optimized prompt, nothing else. Make it detailed and specific fo
     try {
       imageResponse = await ai.models.generateContent({
         model: selectedImageModel,
-        contents: [{ role: "user", parts: [{ text: refinedPrompt }] }],
+        contents: [{ role: "user", parts: [{ text: promptForImage }] }],
         config: {
           responseModalities: ["TEXT", "IMAGE"],
         },
       });
+      logWithTime(startTime, `Image generated with ${selectedImageModel}`);
     } catch (imageError) {
-      console.warn(`[Artifacts] Image model ${selectedImageModel} failed, trying fallback:`, imageError);
+      logWithTime(startTime, `Primary model failed: ${imageError}, trying fallback...`);
 
-      // Try fallback image model
       try {
         imageResponse = await ai.models.generateContent({
           model: IMAGE_MODEL_FALLBACK,
-          contents: [{ role: "user", parts: [{ text: refinedPrompt }] }],
+          contents: [{ role: "user", parts: [{ text: promptForImage }] }],
           config: {
             responseModalities: ["TEXT", "IMAGE"],
           },
         });
         usedModel = IMAGE_MODEL_FALLBACK;
+        logWithTime(startTime, `Image generated with fallback ${IMAGE_MODEL_FALLBACK}`);
       } catch (fallbackError) {
-        console.error(`[Artifacts] All image models failed:`, fallbackError);
+        logWithTime(startTime, `All models failed: ${fallbackError}`);
         return NextResponse.json(
           { error: "Failed to generate image with all available models" },
           { status: 500 }
@@ -193,14 +217,15 @@ Return ONLY the optimized prompt, nothing else. Make it detailed and specific fo
     }
 
     if (!imageData) {
-      console.error(`[Artifacts] No image data in response`);
+      logWithTime(startTime, "ERROR: No image data in response");
       return NextResponse.json(
         { error: "No image was generated. The model may not support image generation for this prompt." },
         { status: 500 }
       );
     }
 
-    console.log(`[Artifacts] Successfully generated image using ${usedModel}`);
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    logWithTime(startTime, `SUCCESS! Total time: ${totalTime}s, model: ${usedModel}`);
 
     return NextResponse.json({
       success: true,
@@ -211,14 +236,16 @@ Return ONLY the optimized prompt, nothing else. Make it detailed and specific fo
         toolId,
         imageData: `data:${imageMimeType};base64,${imageData}`,
         textContent: textContent || null,
-        refinedPrompt,
+        refinedPrompt: promptForImage,
         model: usedModel,
         notebookId,
+        generationTimeMs: Date.now() - startTime,
       },
     });
 
   } catch (error) {
-    console.error("[Artifacts] Error:", error);
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.error(`[Artifacts +${totalTime}s] ERROR:`, error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
