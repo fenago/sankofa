@@ -6,6 +6,35 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+// Notebook settings for inverse profiling and BKT configuration
+export interface BKTParameters {
+  use_skill_specific: boolean
+  default_pL0: number // Initial probability of knowing (0-1)
+  default_pT: number  // Probability of learning from attempt (0-1)
+  default_pS: number  // Probability of slip - knows but fails (0-1)
+  default_pG: number  // Probability of guess - doesn't know but succeeds (0-1)
+}
+
+export interface NotebookSettings {
+  inverse_profiling_enabled: boolean
+  session_tracking_enabled: boolean
+  interaction_logging_enabled: boolean
+  bkt_parameters: BKTParameters
+}
+
+export const DEFAULT_NOTEBOOK_SETTINGS: NotebookSettings = {
+  inverse_profiling_enabled: true,
+  session_tracking_enabled: true,
+  interaction_logging_enabled: true,
+  bkt_parameters: {
+    use_skill_specific: false,
+    default_pL0: 0.3,
+    default_pT: 0.1,
+    default_pS: 0.1,
+    default_pG: 0.2,
+  },
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -37,6 +66,7 @@ export type Database = {
           name: string
           description: string | null
           color: string | null
+          settings: NotebookSettings | null
           created_at: string | null
           updated_at: string | null
         }
@@ -46,6 +76,7 @@ export type Database = {
           name: string
           description?: string | null
           color?: string | null
+          settings?: NotebookSettings | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -55,6 +86,7 @@ export type Database = {
           name?: string
           description?: string | null
           color?: string | null
+          settings?: NotebookSettings | null
           created_at?: string | null
           updated_at?: string | null
         }

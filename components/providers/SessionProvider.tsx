@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useCallback, useEffect, useRef } from 'react'
 import { useSession } from '@/hooks/useSession'
 import { usePracticeTracking, useInteractions } from '@/hooks/useInteractions'
+import { useNotebookSettings } from '@/hooks/useNotebookSettings'
 import type {
   LearnerSession,
   InteractionEventType,
@@ -10,6 +11,7 @@ import type {
   StartSessionResponse,
   EndSessionResponse,
 } from '@/lib/types/interactions'
+import type { NotebookSettings } from '@/lib/types/database'
 
 interface SessionContextValue {
   // Session state
@@ -17,6 +19,10 @@ interface SessionContextValue {
   sessionId: string | null
   hasActiveSession: boolean
   isLoading: boolean
+
+  // Settings state
+  settings: NotebookSettings | null
+  isTrackingEnabled: boolean
 
   // Session actions
   startSession: (entryPoint?: 'direct' | 'notification' | 'email' | 'bookmark') => Promise<StartSessionResponse | null>
@@ -85,6 +91,13 @@ export function SessionProvider({
 }: SessionProviderProps) {
   const isInitializedRef = useRef(false)
 
+  // Get notebook settings to check if tracking is enabled
+  const {
+    settings,
+    isTrackingEnabled,
+    isInverseProfilingActive,
+  } = useNotebookSettings(notebookId)
+
   // Use the session hook
   const {
     session,
@@ -111,13 +124,17 @@ export function SessionProvider({
   // Use interactions for general recording
   const { recordInteraction: recordInteractionBase } = useInteractions(notebookId, { enabled: false })
 
-  // Wrap startSession to handle initialization
+  // Wrap startSession to handle initialization and settings check
   const startSession = useCallback(async (
     entryPoint: 'direct' | 'notification' | 'email' | 'bookmark' = 'direct'
   ) => {
+    // Check if session tracking is enabled
+    if (!settings?.session_tracking_enabled) {
+      return null
+    }
     const result = await startSessionBase(entryPoint)
     return result
-  }, [startSessionBase])
+  }, [startSessionBase, settings?.session_tracking_enabled])
 
   // Wrap endSession
   const endSession = useCallback(async (
@@ -128,21 +145,25 @@ export function SessionProvider({
     return result
   }, [endSessionBase])
 
-  // Wrap record interaction
+  // Wrap record interaction - respects settings
   const recordInteraction = useCallback(async (
     eventType: InteractionEventType,
     payload?: InteractionPayload,
     skillId?: string
   ) => {
+    // Check if interaction logging is enabled
+    if (!settings?.interaction_logging_enabled) {
+      return
+    }
     if (!sessionId) {
       console.warn('Cannot record interaction: no active session')
       return
     }
     await recordInteractionBase(sessionId, eventType, payload, skillId)
     recordActivity()
-  }, [sessionId, recordInteractionBase, recordActivity])
+  }, [sessionId, recordInteractionBase, recordActivity, settings?.interaction_logging_enabled])
 
-  // Wrap practice attempt
+  // Wrap practice attempt - respects settings
   const recordPracticeAttempt = useCallback(async (
     skillId: string,
     questionId: string,
@@ -157,11 +178,14 @@ export function SessionProvider({
       difficulty?: number
     }
   ) => {
+    if (!settings?.interaction_logging_enabled) {
+      return
+    }
     await recordPracticeAttemptBase(skillId, questionId, isCorrect, userAnswer, responseTimeMs, options)
     recordActivity()
-  }, [recordPracticeAttemptBase, recordActivity])
+  }, [recordPracticeAttemptBase, recordActivity, settings?.interaction_logging_enabled])
 
-  // Wrap hint requested
+  // Wrap hint requested - respects settings
   const recordHintRequested = useCallback(async (
     skillId: string,
     questionId: string,
@@ -169,34 +193,49 @@ export function SessionProvider({
     totalHintsAvailable: number,
     timeBeforeHintMs: number
   ) => {
+    if (!settings?.interaction_logging_enabled) {
+      return
+    }
     await recordHintRequestedBase(skillId, questionId, hintNumber, totalHintsAvailable, timeBeforeHintMs)
     recordActivity()
-  }, [recordHintRequestedBase, recordActivity])
+  }, [recordHintRequestedBase, recordActivity, settings?.interaction_logging_enabled])
 
-  // Wrap skill viewed
+  // Wrap skill viewed - respects settings
   const recordSkillViewed = useCallback(async (skillId: string) => {
+    if (!settings?.interaction_logging_enabled) {
+      return
+    }
     await recordSkillViewedBase(skillId)
     recordActivity()
-  }, [recordSkillViewedBase, recordActivity])
+  }, [recordSkillViewedBase, recordActivity, settings?.interaction_logging_enabled])
 
-  // Wrap confidence rated
+  // Wrap confidence rated - respects settings
   const recordConfidenceRated = useCallback(async (
     skillId: string,
     rating: number,
     ratingType: 'pre_attempt' | 'post_attempt' | 'self_assessment',
     actualOutcome?: boolean
   ) => {
+    if (!settings?.interaction_logging_enabled) {
+      return
+    }
     await recordConfidenceRatedBase(skillId, rating, ratingType, actualOutcome)
     recordActivity()
-  }, [recordConfidenceRatedBase, recordActivity])
+  }, [recordConfidenceRatedBase, recordActivity, settings?.interaction_logging_enabled])
 
-  // Auto-start session on mount if enabled
+  // Auto-start session on mount if enabled and settings allow
   useEffect(() => {
-    if (autoStart && notebookId && !hasActiveSession && !isInitializedRef.current) {
+    if (
+      autoStart &&
+      notebookId &&
+      !hasActiveSession &&
+      !isInitializedRef.current &&
+      settings?.session_tracking_enabled // Only auto-start if session tracking is enabled
+    ) {
       isInitializedRef.current = true
       startSession('direct')
     }
-  }, [autoStart, notebookId, hasActiveSession, startSession])
+  }, [autoStart, notebookId, hasActiveSession, startSession, settings?.session_tracking_enabled])
 
   // Track mouse/keyboard activity
   useEffect(() => {
@@ -234,6 +273,8 @@ export function SessionProvider({
     sessionId,
     hasActiveSession,
     isLoading: session === undefined,
+    settings: settings || null,
+    isTrackingEnabled,
     startSession,
     endSession,
     recordActivity,
