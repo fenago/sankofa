@@ -65,6 +65,10 @@ const entityTypeColors: Record<string, string> = {
   other: "bg-gray-100 text-gray-800",
 };
 
+// Define nodeTypes and edgeTypes outside component to prevent React Flow warning
+const nodeTypes = {};
+const edgeTypes = {};
+
 export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPanelProps) {
   // Use SWR for cached graph data
   const { skills, entities, prerequisites, loading, error: graphError, refetch } = useGraph(notebookId);
@@ -311,6 +315,8 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
                     fitView
                     fitViewOptions={{ padding: 0.2 }}
                     minZoom={0.3}
