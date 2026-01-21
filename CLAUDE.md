@@ -128,6 +128,28 @@ The platform is built on research-backed educational psychology:
 
 ---
 
+## Versioning
+
+**IMPORTANT: Always update the version when pushing to GitHub.**
+
+The app version is displayed in the UI header. When making significant changes and pushing to GitHub:
+
+1. **Update `package.json`** - Increment the version number following semver:
+   - Patch (0.2.0 → 0.2.1): Bug fixes
+   - Minor (0.2.0 → 0.3.0): New features
+   - Major (0.2.0 → 1.0.0): Breaking changes
+
+2. **Update the UI badge** in `app/(dashboard)/layout.tsx`:
+   ```tsx
+   <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-mono">vX.Y.Z</span>
+   ```
+
+Current version location:
+- `package.json` line 3: `"version": "X.Y.Z"`
+- `app/(dashboard)/layout.tsx`: Version badge in header
+
+---
+
 ## Commands
 
 ```bash
