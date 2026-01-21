@@ -183,7 +183,7 @@ Only extract skills and entities that are clearly present in the text. Be conser
     notebookId,
     bloomLevel: validateBloomLevel(s.bloomLevel),
     secondaryBloomLevels: s.secondaryBloomLevels?.map(validateBloomLevel),
-    estimatedMinutes: s.estimatedMinutes,
+    estimatedMinutes: s.estimatedMinutes ? Math.min(120, Math.max(5, s.estimatedMinutes)) : 30,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
     // IRT 3PL model parameters
     irt: s.irt ? {
