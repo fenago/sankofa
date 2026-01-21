@@ -14,7 +14,9 @@ import { OutputsPanel } from '@/components/OutputsPanel'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { SessionProvider } from '@/components/providers/SessionProvider'
 import { InterventionHandler } from '@/components/InterventionHandler'
+import { MicroAssessmentDialog } from '@/components/MicroAssessmentDialog'
 import { useAdaptiveLearning } from '@/hooks/useAdaptiveLearning'
+import { useMicroAssessment } from '@/hooks/useMicroAssessment'
 import { Source, Message, ResponseLength } from '@/lib/types'
 import { CustomPrompts, getStoredPrompts } from '@/lib/prompts'
 
@@ -41,6 +43,14 @@ export default function NotebookPage({ params }: NotebookPageProps) {
     refetchAll: refreshAdaptive,
     dismissIntervention,
   } = useAdaptiveLearning(notebookId)
+
+  // Micro-assessment hook for periodic check-ins
+  const {
+    assessment: microAssessment,
+    submitResults: submitMicroAssessment,
+    skipAssessment: skipMicroAssessment,
+    recordInteraction,
+  } = useMicroAssessment({ notebookId, enabled: true })
 
   // State (similar to home page)
   const [messages, setMessages] = useState<Message[]>([])
@@ -218,6 +228,9 @@ export default function NotebookPage({ params }: NotebookPageProps) {
     setMessages((prev) => [...prev, newMessage])
     setIsChatting(true)
     setStreamingContent('')
+
+    // Track interaction for micro-assessments
+    recordInteraction()
 
     try {
       // Build context from sources
@@ -442,6 +455,21 @@ export default function NotebookPage({ params }: NotebookPageProps) {
         interventions={interventions}
         onDismiss={dismissIntervention}
       />
+
+      {/* Micro-assessment dialog for periodic check-ins */}
+      {microAssessment && (
+        <MicroAssessmentDialog
+          open={microAssessment.shouldShow}
+          onOpenChange={(open) => {
+            if (!open) skipMicroAssessment()
+          }}
+          assessmentTypeName={microAssessment.assessmentTypeName}
+          assessmentTypeDescription={microAssessment.assessmentTypeDescription}
+          questions={microAssessment.questions}
+          onComplete={submitMicroAssessment}
+          onSkip={skipMicroAssessment}
+        />
+      )}
     <div className="flex flex-col h-[calc(100vh-88px)] bg-white text-black font-sans overflow-hidden -mx-4 -my-6">
       {/* Notebook Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">

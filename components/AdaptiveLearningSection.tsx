@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +15,7 @@ import {
   Lightbulb,
   TrendingUp,
   Users,
+  BarChart3,
 } from 'lucide-react'
 import { RecommendationCard } from './RecommendationCard'
 import type { SkillRecommendation, ProfileSummary } from '@/hooks/useAdaptiveLearning'
@@ -103,30 +105,42 @@ export function AdaptiveLearningSection({
       <CardContent className="space-y-4">
         {/* Profile summary badges */}
         {profileSummary && (
-          <div className="flex flex-wrap gap-2">
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getExpertiseColor(profileSummary.expertiseLevel)}`}
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getExpertiseColor(profileSummary.expertiseLevel)}`}
+              >
+                <Brain className="h-3 w-3" />
+                {profileSummary.expertiseLevel.charAt(0).toUpperCase() +
+                  profileSummary.expertiseLevel.slice(1)}
+              </span>
+
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                {getGoalIcon(profileSummary.goalOrientation)}
+                {profileSummary.goalOrientation.charAt(0).toUpperCase() +
+                  profileSummary.goalOrientation.slice(1)}
+              </span>
+
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                <Lightbulb className="h-3 w-3" />
+                {masteredCount} mastered
+              </span>
+
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                <Target className="h-3 w-3" />
+                {totalZPDSkills} ready
+              </span>
+            </div>
+
+            {/* View Full Profile link */}
+            <Link
+              href={`/notebooks/${notebookId}/profile`}
+              className="inline-flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-800 hover:underline"
             >
-              <Brain className="h-3 w-3" />
-              {profileSummary.expertiseLevel.charAt(0).toUpperCase() +
-                profileSummary.expertiseLevel.slice(1)}
-            </span>
-
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-              {getGoalIcon(profileSummary.goalOrientation)}
-              {profileSummary.goalOrientation.charAt(0).toUpperCase() +
-                profileSummary.goalOrientation.slice(1)}
-            </span>
-
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-              <Lightbulb className="h-3 w-3" />
-              {masteredCount} mastered
-            </span>
-
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-              <Target className="h-3 w-3" />
-              {totalZPDSkills} ready
-            </span>
+              <BarChart3 className="h-3 w-3" />
+              View Full Profile
+              <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
         )}
 
@@ -155,9 +169,17 @@ export function AdaptiveLearningSection({
             <p className="text-sm text-muted-foreground mb-2">
               No learner profile yet
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-3">
               Complete some practice exercises to generate personalized recommendations
             </p>
+            <Link
+              href={`/notebooks/${notebookId}/profile`}
+              className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 hover:underline"
+            >
+              <BarChart3 className="h-3 w-3" />
+              View Learning Frameworks
+              <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
         )}
 

@@ -4,6 +4,8 @@ import { DEFAULT_PROMPTS } from "@/lib/prompts";
 import { ResponseLength } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { generateQueryEmbedding } from "@/lib/pipeline/embeddings";
+import { buildPersonalizationContext, personalizeForChat } from "@/lib/adaptive/personalization-service";
+import type { InverseProfile } from "@/lib/types/interactions";
 
 // Force dynamic to prevent caching
 export const dynamic = 'force-dynamic';
@@ -29,6 +31,87 @@ interface SearchResult {
   source_id: string
   content: string
   similarity: number
+}
+
+interface LearnerStats {
+  profile: InverseProfile | null
+  masteredCount: number
+  totalSkills: number
+  avgAccuracy: number
+}
+
+/**
+ * Fetch learner profile and stats for personalization
+ */
+async function getLearnerStats(
+  notebookId: string,
+  userId: string
+): Promise<LearnerStats> {
+  try {
+    const supabase = await createClient();
+
+    // Fetch inverse profile
+    const { data: profileData } = await supabase
+      .from('inverse_profiles')
+      .select('*')
+      .eq('notebook_id', notebookId)
+      .eq('learner_id', userId)
+      .single();
+
+    const profile: InverseProfile | null = profileData
+      ? {
+          id: profileData.id,
+          learner_id: profileData.learner_id,
+          notebook_id: profileData.notebook_id,
+          version: profileData.version,
+          computed_at: profileData.computed_at,
+          interactions_analyzed: profileData.interactions_analyzed,
+          knowledge_state: profileData.knowledge_state as unknown as InverseProfile['knowledge_state'],
+          cognitive_indicators: profileData.cognitive_indicators as unknown as InverseProfile['cognitive_indicators'],
+          metacognitive_indicators: profileData.metacognitive_indicators as unknown as InverseProfile['metacognitive_indicators'],
+          motivational_indicators: profileData.motivational_indicators as unknown as InverseProfile['motivational_indicators'],
+          behavioral_patterns: profileData.behavioral_patterns as unknown as InverseProfile['behavioral_patterns'],
+          confidence_scores: profileData.confidence_scores as unknown as InverseProfile['confidence_scores'],
+        }
+      : null;
+
+    // Fetch practice stats
+    const { data: practiceInteractions } = await supabase
+      .from('learner_interactions')
+      .select('payload')
+      .eq('notebook_id', notebookId)
+      .eq('learner_id', userId)
+      .eq('event_type', 'practice_attempt');
+
+    let avgAccuracy = 0.5;
+    if (practiceInteractions && practiceInteractions.length > 0) {
+      const correctCount = practiceInteractions.filter(
+        i => (i.payload as Record<string, unknown>)?.isCorrect === true
+      ).length;
+      avgAccuracy = correctCount / practiceInteractions.length;
+    }
+
+    // Get skill counts from profile
+    const masteredCount = profile?.knowledge_state?.skillsMastered ?? 0;
+    const totalSkills = (profile?.knowledge_state?.skillsMastered ?? 0) +
+      (profile?.knowledge_state?.skillsInProgress ?? 0) +
+      (profile?.knowledge_state?.skillsNotStarted ?? 0);
+
+    return {
+      profile,
+      masteredCount,
+      totalSkills,
+      avgAccuracy,
+    };
+  } catch (error) {
+    console.error('[Chat] Error fetching learner stats:', error);
+    return {
+      profile: null,
+      masteredCount: 0,
+      totalSkills: 0,
+      avgAccuracy: 0.5,
+    };
+  }
 }
 
 /**
@@ -125,6 +208,36 @@ export async function POST(request: NextRequest) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
+    const supabase = await createClient();
+
+    // Get current user for personalization
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Fetch learner profile and stats for personalization (non-blocking)
+    let personalizationAddition = '';
+    if (notebookId && user) {
+      try {
+        const learnerStats = await getLearnerStats(notebookId, user.id);
+        const personalizationContext = buildPersonalizationContext(
+          learnerStats.profile,
+          learnerStats.masteredCount,
+          learnerStats.totalSkills,
+          learnerStats.avgAccuracy
+        );
+        const chatPersonalization = personalizeForChat(personalizationContext);
+
+        if (chatPersonalization.systemAddition || chatPersonalization.responseGuidelines.length > 0) {
+          personalizationAddition = chatPersonalization.systemAddition;
+          if (chatPersonalization.responseGuidelines.length > 0) {
+            personalizationAddition += `\n\n### Personalized Guidelines\n${chatPersonalization.responseGuidelines.map(g => `- ${g}`).join('\n')}`;
+          }
+          console.log('[Chat] Applied personalization for learner');
+        }
+      } catch (personalizationError) {
+        console.warn('[Chat] Personalization skipped:', personalizationError);
+        // Continue without personalization
+      }
+    }
 
     // Determine context - use RAG if notebookId provided and useRAG is true
     let context = providedContext || "";
@@ -155,7 +268,8 @@ export async function POST(request: NextRequest) {
     const lengthInstruction = RESPONSE_LENGTH_INSTRUCTIONS[responseLength || "detailed"];
     const systemPrompt = basePrompt.replace("{{context}}", contextSection) +
       lengthInstruction +
-      (enableImageGeneration ? "\nYou can generate images when it would help explain concepts. When generating images, describe what you're creating." : "");
+      (enableImageGeneration ? "\nYou can generate images when it would help explain concepts. When generating images, describe what you're creating." : "") +
+      personalizationAddition;
 
     const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
