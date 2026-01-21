@@ -28,6 +28,10 @@ function getClient(): GoogleGenAI {
   return client
 }
 
+// Maximum characters to send to Gemini for extraction
+// ~30K chars ≈ ~7500 tokens, leaves room for the prompt and response
+const MAX_EXTRACTION_TEXT_LENGTH = 30000
+
 /**
  * Extract skills and entities from a text chunk
  */
@@ -39,9 +43,20 @@ export async function extractFromText(
 ): Promise<GraphExtractionResult> {
   const ai = getClient()
 
+  // Limit text size to avoid Gemini timeouts on serverless
+  let processedText = text
+  if (text.length > MAX_EXTRACTION_TEXT_LENGTH) {
+    console.log(`[Extraction] Text too long (${text.length} chars), truncating to ${MAX_EXTRACTION_TEXT_LENGTH}`)
+    // Take first and last portions to get intro and conclusion
+    const halfLimit = Math.floor(MAX_EXTRACTION_TEXT_LENGTH / 2)
+    processedText = text.slice(0, halfLimit) + '\n\n[...content truncated...]\n\n' + text.slice(-halfLimit)
+  }
+
   const existingContext = existingSkillNames?.length
     ? `\n\nExisting skills in this notebook (reference these by name if the text discusses them):\n${existingSkillNames.join(', ')}`
     : ''
+
+  console.log(`[Extraction] Starting extraction for ${processedText.length} chars`)
 
   const prompt = `Analyze the following educational content and extract:
 
@@ -70,7 +85,7 @@ For each skill, determine:
 ${existingContext}
 
 TEXT TO ANALYZE:
-${text}
+${processedText}
 
 Respond with valid JSON matching this structure:
 {
@@ -146,19 +161,30 @@ Respond with valid JSON matching this structure:
 
 Only extract skills and entities that are clearly present in the text. Be conservative - quality over quantity.`
 
-  const response = await ai.models.generateContent({
-    model: EXTRACTION_MODEL,
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-    },
-  })
+  let response
+  try {
+    const startTime = Date.now()
+    response = await ai.models.generateContent({
+      model: EXTRACTION_MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
+    })
+    console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
+  } catch (apiError) {
+    console.error('[Extraction] Gemini API call failed:', apiError)
+    throw new Error(`Gemini API failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`)
+  }
 
   const responseText = response.text
   if (!responseText) {
+    console.error('[Extraction] Empty response from Gemini')
     throw new Error('Empty response from extraction model')
   }
+
+  console.log(`[Extraction] Response received: ${responseText.length} chars`)
 
   let parsed: RawExtractionResult
   try {
@@ -169,9 +195,12 @@ Only extract skills and entities that are clearly present in the text. Be conser
     if (jsonMatch) {
       parsed = JSON.parse(jsonMatch[1])
     } else {
+      console.error('[Extraction] Failed to parse JSON, response preview:', responseText.slice(0, 500))
       throw new Error('Failed to parse extraction response as JSON')
     }
   }
+
+  console.log(`[Extraction] Parsed ${parsed.skills?.length || 0} skills, ${parsed.entities?.length || 0} entities`)
 
   const now = Date.now()
 

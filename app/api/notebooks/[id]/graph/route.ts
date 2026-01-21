@@ -122,16 +122,39 @@ export async function POST(request: Request, { params }: RouteParams) {
       .select('id, raw_text')
       .eq('notebook_id', notebookId)
       .eq('status', 'success')
-      .not('raw_text', 'is', null)
 
     if (sourcesError || !sources || sources.length === 0) {
       return NextResponse.json({ error: 'No sources found' }, { status: 404 })
     }
 
+    // For sources without raw_text, reconstruct from chunks
+    const textsToExtract: { content: string; sourceId: string }[] = []
+
+    for (const source of sources) {
+      if (source.raw_text) {
+        textsToExtract.push({ content: source.raw_text, sourceId: source.id })
+      } else {
+        // Reconstruct from chunks
+        const { data: chunks } = await supabase
+          .from('chunks')
+          .select('content')
+          .eq('source_id', source.id)
+          .order('chunk_index', { ascending: true })
+
+        if (chunks && chunks.length > 0) {
+          const reconstructedText = chunks.map(c => c.content).join('\n\n')
+          textsToExtract.push({ content: reconstructedText, sourceId: source.id })
+          console.log(`[Graph] Reconstructed ${reconstructedText.length} chars from ${chunks.length} chunks for source ${source.id}`)
+        }
+      }
+    }
+
+    if (textsToExtract.length === 0) {
+      return NextResponse.json({ error: 'No source content available' }, { status: 404 })
+    }
+
     // Extract from all sources
-    const texts = sources
-      .filter(s => s.raw_text)
-      .map(s => ({ content: s.raw_text!, sourceId: s.id }))
+    const texts = textsToExtract
 
     const result = await batchExtractFromTexts(texts, notebookId)
     await storeGraphExtraction(result)
