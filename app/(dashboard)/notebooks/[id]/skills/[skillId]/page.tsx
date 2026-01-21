@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNotebook } from '@/hooks/useNotebooks'
 import { useSkillPractice } from '@/hooks/usePractice'
+import { useSkillDetails } from '@/hooks/useSkillDetails'
 import {
   SkillMasteryGauge,
   PrerequisiteTree,
@@ -17,53 +18,9 @@ import {
   NextReview,
 } from '@/components/skills'
 import { WorkedExample } from '@/components/practice'
-import { cn } from '@/lib/utils'
-import useSWR from 'swr'
-import { fetcher } from '@/lib/swr-config'
 
 interface SkillDetailPageProps {
   params: Promise<{ id: string; skillId: string }>
-}
-
-interface SkillData {
-  id: string
-  name: string
-  description: string
-  bloomLevel: number
-  difficulty: number
-  isThresholdConcept: boolean
-  misconceptions?: string[]
-  scaffoldingNotes?: Record<string, string>
-  prerequisites: Array<{
-    id: string
-    name: string
-    pMastery: number
-  }>
-  dependents: Array<{
-    id: string
-    name: string
-    pMastery: number
-  }>
-}
-
-interface LearnerSkillState {
-  pMastery: number
-  masteryStatus: 'not_started' | 'learning' | 'mastered'
-  scaffoldLevel: 1 | 2 | 3 | 4
-  nextReviewAt?: string
-  lastReviewAt?: string
-  reviewCount: number
-  easinessFactor: number
-  consecutiveSuccesses: number
-  consecutiveFailures: number
-  totalAttempts: number
-  correctAttempts: number
-  practiceHistory: Array<{
-    date: string
-    isCorrect: boolean
-    responseTimeMs?: number
-    hintsUsed?: number
-  }>
 }
 
 const BLOOM_LEVELS = [
@@ -79,25 +36,33 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
   const { id: notebookId, skillId } = use(params)
   const { notebook, loading: notebookLoading, error: notebookError } = useNotebook(notebookId)
 
-  // Fetch skill details
-  const { data: skillData, isLoading: skillLoading } = useSWR<{ available: boolean; skill: SkillData }>(
-    notebookId && skillId ? `/api/notebooks/${notebookId}/graph?action=skill&skillId=${skillId}` : null,
-    fetcher
-  )
-
-  // Fetch learner state for this skill
-  const { data: stateData, isLoading: stateLoading } = useSWR<{ available: boolean; state: LearnerSkillState }>(
-    notebookId && skillId ? `/api/notebooks/${notebookId}/learner?action=skill-state&skillId=${skillId}` : null,
-    fetcher,
-    { onError: () => {} } // Silently handle if endpoint doesn't exist yet
-  )
+  // Fetch skill details with learner state using the combined hook
+  const {
+    skill,
+    learnerState,
+    prerequisites,
+    dependents,
+    available,
+    isLoading: skillLoading,
+  } = useSkillDetails(notebookId, skillId)
 
   // Quick practice hook
   const quickPractice = useSkillPractice(notebookId, skillId)
 
-  const isLoading = notebookLoading || skillLoading || stateLoading
-  const skill = skillData?.skill
-  const learnerState = stateData?.state
+  const isLoading = notebookLoading || skillLoading
+
+  // Transform prerequisites and dependents to the format expected by PrerequisiteTree
+  const prereqsForTree = prerequisites.map(p => ({
+    id: p.skill.id,
+    name: p.skill.name,
+    pMastery: p.learnerState?.pMastery ?? 0,
+  }))
+
+  const dependentsForTree = dependents.map(d => ({
+    id: d.skill.id,
+    name: d.skill.name,
+    pMastery: d.learnerState?.pMastery ?? 0,
+  }))
 
   // Get Bloom level info
   const bloomInfo = skill ? BLOOM_LEVELS.find((b) => b.level === skill.bloomLevel) : null
@@ -224,8 +189,8 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                         pMastery: learnerState?.pMastery || 0,
                         isCurrent: true,
                       }}
-                      prerequisites={skill.prerequisites || []}
-                      dependents={skill.dependents || []}
+                      prerequisites={prereqsForTree}
+                      dependents={dependentsForTree}
                       onSkillClick={(id) => {
                         window.location.href = `/notebooks/${notebookId}/skills/${id}`
                       }}
@@ -234,7 +199,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                 </Card>
 
                 {/* Misconceptions */}
-                {skill.misconceptions && skill.misconceptions.length > 0 && (
+                {skill.commonMisconceptions && skill.commonMisconceptions.length > 0 && (
                   <Card className="border-amber-200 bg-amber-50">
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2 text-amber-800">
@@ -244,7 +209,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2">
-                        {skill.misconceptions.map((m, i) => (
+                        {skill.commonMisconceptions.map((m, i) => (
                           <li key={i} className="text-sm text-amber-900 flex items-start gap-2">
                             <span className="text-amber-500 mt-0.5">•</span>
                             {m}
@@ -255,19 +220,19 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                   </Card>
                 )}
 
-                {/* Scaffolding Notes */}
-                {skill.scaffoldingNotes && Object.keys(skill.scaffoldingNotes).length > 0 && (
+                {/* Scaffolding Levels */}
+                {skill.scaffoldingLevels && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">Learning Support by Level</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      {Object.entries(skill.scaffoldingNotes).map(([level, note]) => (
+                      {Object.entries(skill.scaffoldingLevels).map(([level, note]) => (
                         <div key={level} className="flex gap-3">
                           <Badge variant="outline" className="shrink-0">
-                            Level {level}
+                            {level.replace('level', 'Level ')}
                           </Badge>
-                          <p className="text-sm text-muted-foreground">{note}</p>
+                          <p className="text-sm text-muted-foreground">{note as string}</p>
                         </div>
                       ))}
                     </CardContent>
@@ -298,11 +263,12 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                   </Card>
 
                   {/* Scaffold Level */}
-                  <ScaffoldLevel level={learnerState?.scaffoldLevel || 2} />
+                  <ScaffoldLevel level={learnerState?.currentScaffoldLevel || 2} />
                 </div>
 
                 {/* Practice History */}
-                <PracticeHistory attempts={learnerState?.practiceHistory || []} />
+                {/* Note: Practice history would come from interactions data - currently showing summary stats */}
+                <PracticeHistory attempts={[]} />
 
                 {/* Stats Row */}
                 <div className="grid grid-cols-3 gap-4">
@@ -382,10 +348,11 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
           <div className="space-y-4">
             {/* Next Review */}
             <NextReview
-              nextReviewAt={learnerState?.nextReviewAt}
-              lastReviewAt={learnerState?.lastReviewAt}
-              reviewCount={learnerState?.reviewCount || 0}
-              easinessFactor={learnerState?.easinessFactor || 2.5}
+              nextReviewAt={learnerState?.spacedRepetition?.nextReviewAt
+                ? new Date(learnerState.spacedRepetition.nextReviewAt)
+                : null}
+              reviewCount={learnerState?.spacedRepetition?.repetitions || 0}
+              easinessFactor={learnerState?.spacedRepetition?.easeFactor || 2.5}
             />
 
             {/* Quick Actions */}
@@ -416,17 +383,17 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
             </Card>
 
             {/* Related Skills */}
-            {(skill.prerequisites.length > 0 || skill.dependents.length > 0) && (
+            {(prereqsForTree.length > 0 || dependentsForTree.length > 0) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Related Skills</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {skill.prerequisites.length > 0 && (
+                  {prereqsForTree.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Prerequisites</p>
                       <div className="space-y-1">
-                        {skill.prerequisites.slice(0, 3).map((prereq) => (
+                        {prereqsForTree.slice(0, 3).map((prereq) => (
                           <Link
                             key={prereq.id}
                             href={`/notebooks/${notebookId}/skills/${prereq.id}`}
@@ -438,11 +405,11 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                       </div>
                     </div>
                   )}
-                  {skill.dependents.length > 0 && (
+                  {dependentsForTree.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Leads To</p>
                       <div className="space-y-1">
-                        {skill.dependents.slice(0, 3).map((dep) => (
+                        {dependentsForTree.slice(0, 3).map((dep) => (
                           <Link
                             key={dep.id}
                             href={`/notebooks/${notebookId}/skills/${dep.id}`}

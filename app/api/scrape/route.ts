@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
         title,
       });
 
-      // Process through pipeline (async - don't wait)
-      processSource({
+      // Process through pipeline (must await in serverless environment)
+      const result = await processSource({
         sourceId,
         notebookId,
         userId: user.id,
@@ -80,7 +80,11 @@ export async function POST(request: NextRequest) {
         title,
         url,
         sourceType: "url",
-      }).catch(err => console.error("Pipeline processing failed:", err));
+      });
+
+      if (!result.success) {
+        console.error("Pipeline processing failed:", result.error);
+      }
 
       return NextResponse.json({
         sourceId,
@@ -88,7 +92,10 @@ export async function POST(request: NextRequest) {
         content,
         text,
         url,
-        processing: true,
+        processing: false,
+        success: result.success,
+        chunkCount: result.chunkCount,
+        error: result.error,
       });
     }
 
