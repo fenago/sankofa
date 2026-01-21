@@ -83,7 +83,22 @@ export async function processSource(options: ProcessSourceOptions): Promise<{
       }
     }
 
+    // IMPORTANT: Update source status to success BEFORE graph extraction
+    // This ensures the source is marked complete even if graph extraction times out
+    // (common issue with serverless functions on Netlify)
+    await supabase
+      .from('sources')
+      .update({
+        status: 'success',
+        raw_text: text,
+        title: title || filename || url,
+      })
+      .eq('id', sourceId)
+
+    console.log(`[Pipeline] Source ${sourceId} marked as success with ${chunks.length} chunks`)
+
     // Extract entities and skills for knowledge graph (if Neo4J is available)
+    // This is done AFTER marking success so serverless timeout doesn't leave source stuck
     let graphExtracted = false
     if (isNeo4JAvailable()) {
       try {
@@ -99,16 +114,6 @@ export async function processSource(options: ProcessSourceOptions): Promise<{
     } else {
       console.log('[Pipeline] Neo4J not available, skipping graph extraction')
     }
-
-    // Update source status to success and store raw text
-    await supabase
-      .from('sources')
-      .update({
-        status: 'success',
-        raw_text: text,
-        title: title || filename || url,
-      })
-      .eq('id', sourceId)
 
     return {
       success: true,
