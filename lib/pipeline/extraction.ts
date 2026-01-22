@@ -58,74 +58,131 @@ export async function extractFromText(
 
   console.log(`[Extraction] Starting extraction for ${text.length} chars`)
 
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
+  const prompt = `You are an expert curriculum designer and learning scientist. Extract a comprehensive, research-grounded knowledge graph from this educational content.
 
-Your goal is to create a USEFUL and ACCURATE knowledge graph for learning.
+## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
 
-Extract:
-1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
-   - What does a learner need to know or be able to do after studying this?
-   - Include both knowledge (understanding concepts) and abilities (applying techniques)
-   - Use your expertise: if an obvious foundational skill is needed but not explicitly stated, include it
+You must apply these frameworks when analyzing each skill:
 
-2. **Prerequisites**: The dependency relationships between skills
-   - Which skills must be learned before others?
-   - Include OBVIOUS prerequisites even if not explicitly stated (e.g., "calculating mean" before "calculating standard deviation")
-   - Use pedagogical judgment - what would a good teacher identify as prerequisites?
+### 1. Bloom's Taxonomy (Revised 2001)
+- Level 1 (Remember): Recall facts, terms, basic concepts
+- Level 2 (Understand): Explain ideas, interpret meaning
+- Level 3 (Apply): Use knowledge in new situations
+- Level 4 (Analyze): Draw connections, identify patterns
+- Level 5 (Evaluate): Justify decisions, critique
+- Level 6 (Create): Produce new work, design solutions
 
-3. **Entities**: Key terms, people, formulas, theorems, and important references
+### 2. Item Response Theory (IRT) - 3PL Model
+For assessment calibration:
+- Difficulty (b): -3 (very easy) to +3 (very hard), 0 = average
+- Discrimination (a): 0.5 (poor) to 2.5 (excellent) - how well it differentiates ability
+- Guessing (c): 0 to 0.5 - probability of correct guess (higher for MCQ, lower for free response)
 
-4. **Entity Relationships**: How entities relate to each other
+### 3. Threshold Concepts (Meyer & Land)
+Identify transformative knowledge that:
+- Is TRANSFORMATIVE (changes how learner thinks)
+- Is IRREVERSIBLE (can't "unsee" it once understood)
+- Is INTEGRATIVE (connects previously separate ideas)
+- May be TROUBLESOME (counterintuitive, alien)
 
-For each skill, assess:
-- Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
-- Whether it's a "threshold concept" (transformative knowledge that unlocks new understanding)
-- Estimated time to learn (in minutes)
-- Difficulty (1-10)
-- IRT parameters for assessment:
-  - difficulty: -3 to +3 (0 = average)
-  - discrimination: 0.5 to 2.5
-  - guessing: 0 to 0.5
-- Cognitive load estimate
-- Common misconceptions students might have
-- Keywords for the skill
+### 4. Cognitive Load Theory (Sweller)
+Estimate cognitive demands:
+- Cognitive load: low/medium/high
+- Chunks required: working memory slots needed (2-7)
+- Element interactivity: how many elements must be processed simultaneously
+
+### 5. Instructional Scaffolding (Vygotsky/Wood)
+Define 4 levels of support that fade as mastery increases:
+- Level 1: Full worked examples with explanation
+- Level 2: Partial solutions with gaps to fill
+- Level 3: Hints available on request
+- Level 4: Independent practice
+
+### 6. Mastery Learning (Bloom)
+- Mastery threshold: typically 0.80, use 0.90 for threshold concepts
+- Assessment types: formative, summative, diagnostic, performance, peer
+
+### 7. Spaced Repetition (Ebbinghaus)
+Suggest review intervals based on forgetting curve: [1, 3, 7, 14, 30, 60] days
+
+## SKILLS EXTRACTION
+
+Extract ALL learnable skills with FULL metadata:
+- Be GRANULAR: each skill = one coherent learning objective (5-45 minutes)
+- Include implicit foundational skills learners would need
+- Identify the DOMAIN and SUBDOMAIN for categorization
+
+## PREREQUISITES - CRITICAL FOR GRAPH CONNECTIVITY
+
+The prerequisite graph shows the LEARNING SEQUENCE. Without it, the graph is useless.
+
+For EVERY skill, identify what must be learned first:
+- Explicit dependencies from the content
+- Implicit dependencies a teacher would recognize
+- Use strength levels: "required" (must have), "recommended" (should have), "helpful" (nice to have)
+
+Every skill except true entry-level fundamentals MUST have prerequisites.
 ${existingContext}
 
-TEXT TO ANALYZE:
+## CONTENT TO ANALYZE
+
 ${text}
 
-Respond with valid JSON:
+## OUTPUT FORMAT (JSON)
+
 {
   "skills": [
     {
-      "name": "string (unique, descriptive name)",
-      "description": "string (1-2 sentences explaining the skill)",
+      "name": "Specific, descriptive skill name",
+      "description": "1-2 sentences: what will the learner know/be able to do?",
       "bloomLevel": 1-6,
-      "estimatedMinutes": number,
+      "secondaryBloomLevels": [optional additional levels if skill spans multiple],
+      "estimatedMinutes": 5-45,
       "difficulty": 1-10,
       "irt": {
         "difficulty": -3 to +3,
         "discrimination": 0.5 to 2.5,
         "guessing": 0 to 0.5
       },
-      "isThresholdConcept": boolean,
+      "isThresholdConcept": true/false,
+      "thresholdProperties": {
+        "unlocksDomains": ["domains this concept unlocks"],
+        "troublesomeAspects": ["why this is hard to grasp"]
+      },
       "cognitiveLoadEstimate": "low" | "medium" | "high",
+      "chunksRequired": 2-7,
+      "elementInteractivity": "low" | "medium" | "high",
+      "masteryThreshold": 0.80 or 0.90 for threshold concepts,
+      "assessmentTypes": ["formative", "summative", etc.],
+      "suggestedAssessments": [
+        { "type": "formative", "description": "specific assessment idea", "bloomAlignment": [1,2] }
+      ],
+      "reviewIntervals": [1, 3, 7, 14, 30, 60],
+      "scaffoldingLevels": {
+        "level1": "Full worked example description",
+        "level2": "Partial solution approach",
+        "level3": "Hint strategy",
+        "level4": "Independent practice task"
+      },
       "commonMisconceptions": ["misconception 1", "misconception 2"],
-      "keywords": ["relevant keywords"]
+      "transferDomains": ["where else this skill applies"],
+      "keywords": ["keyword1", "keyword2"],
+      "domain": "main subject area",
+      "subdomain": "specific topic within domain"
     }
   ],
   "prerequisites": [
     {
-      "fromSkillName": "prerequisite skill name (must be learned FIRST)",
-      "toSkillName": "dependent skill name (requires the prerequisite)",
+      "fromSkillName": "prerequisite skill (learned FIRST)",
+      "toSkillName": "dependent skill (requires the prerequisite)",
       "strength": "required" | "recommended" | "helpful",
-      "reasoning": "why this prerequisite relationship exists"
+      "reasoning": "pedagogical explanation of this dependency"
     }
   ],
   "entities": [
     {
       "name": "entity name",
-      "type": "concept" | "person" | "event" | "place" | "term" | "formula" | "other",
+      "type": "concept" | "person" | "term" | "formula" | "theorem" | "event" | "other",
       "description": "brief description"
     }
   ],
@@ -133,20 +190,23 @@ Respond with valid JSON:
     {
       "fromEntityName": "source entity",
       "toEntityName": "target entity",
-      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of",
-      "description": "optional description"
+      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "defines",
+      "description": "relationship description"
     }
   ],
-  "existingSkillReferences": ["names of existing skills referenced in this text"]
+  "existingSkillReferences": []
 }
 
-GUIDELINES:
-- Focus on creating a USEFUL learning graph, not just a literal extraction
-- Include obvious prerequisites even if not explicitly mentioned in the text
-- Use your expertise as a curriculum designer - add foundational skills that learners would need
-- A truly foundational skill (like basic arithmetic) doesn't need prerequisites
-- Be thorough - analyze the entire content
-- The graph should help a learner understand the progression of skills`
+## VALIDATION CHECKLIST
+
+Before responding, ensure:
+✓ Every skill has complete metadata (IRT params, cognitive load, scaffolding)
+✓ Threshold concepts are identified with unlocksDomains and troublesomeAspects
+✓ Every non-foundational skill has at least one prerequisite
+✓ Prerequisites use appropriate strength levels with reasoning
+✓ The graph is CONNECTED - no isolated skills
+✓ Skills are granular (5-45 min each) with clear learning objectives
+✓ Domain and subdomain are specified for categorization`
 
   let response
   try {

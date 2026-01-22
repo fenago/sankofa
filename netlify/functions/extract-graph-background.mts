@@ -25,6 +25,7 @@ interface RawSkill {
   name: string
   description: string
   bloomLevel: number
+  secondaryBloomLevels?: number[]
   estimatedMinutes?: number
   difficulty?: number
   irt?: {
@@ -33,9 +34,32 @@ interface RawSkill {
     guessing: number
   }
   isThresholdConcept?: boolean
+  thresholdProperties?: {
+    unlocksDomains?: string[]
+    troublesomeAspects?: string[]
+  }
   cognitiveLoadEstimate?: 'low' | 'medium' | 'high'
+  elementInteractivity?: 'low' | 'medium' | 'high'
+  chunksRequired?: number
+  masteryThreshold?: number
   commonMisconceptions?: string[]
+  transferDomains?: string[]
+  assessmentTypes?: string[]
+  suggestedAssessments?: {
+    type: string
+    description: string
+    bloomAlignment: number[]
+  }[]
+  reviewIntervals?: number[]
+  scaffoldingLevels?: {
+    level1: string
+    level2: string
+    level3: string
+    level4: string
+  }
   keywords?: string[]
+  domain?: string
+  subdomain?: string
 }
 
 interface RawPrerequisite {
@@ -172,94 +196,100 @@ async function runExtraction(
   const ai = new GoogleGenAI({ apiKey })
   const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 
-  // Use the full detailed prompt for quality extraction
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
+  // Comprehensive extraction prompt with full ed psych frameworks
+  const prompt = `You are an expert curriculum designer and learning scientist. Extract a comprehensive, research-grounded knowledge graph from this educational content.
 
-Your goal is to create a USEFUL and ACCURATE knowledge graph for learning.
+## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
 
-Extract:
-1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
-   - What does a learner need to know or be able to do after studying this?
-   - Include both knowledge (understanding concepts) and abilities (applying techniques)
-   - Use your expertise: if an obvious foundational skill is needed but not explicitly stated, include it
+### 1. Bloom's Taxonomy (Revised 2001)
+- Level 1 (Remember): Recall facts, terms, basic concepts
+- Level 2 (Understand): Explain ideas, interpret meaning
+- Level 3 (Apply): Use knowledge in new situations
+- Level 4 (Analyze): Draw connections, identify patterns
+- Level 5 (Evaluate): Justify decisions, critique
+- Level 6 (Create): Produce new work, design solutions
 
-2. **Prerequisites**: The dependency relationships between skills
-   - Which skills must be learned before others?
-   - Include OBVIOUS prerequisites even if not explicitly stated (e.g., "calculating mean" before "calculating standard deviation")
-   - Use pedagogical judgment - what would a good teacher identify as prerequisites?
+### 2. Item Response Theory (IRT) - 3PL Model
+- Difficulty (b): -3 (very easy) to +3 (very hard), 0 = average
+- Discrimination (a): 0.5 (poor) to 2.5 (excellent)
+- Guessing (c): 0 to 0.5 - probability of correct guess
 
-3. **Entities**: Key terms, people, formulas, theorems, and important references
+### 3. Threshold Concepts (Meyer & Land)
+Identify transformative, irreversible, integrative knowledge that may be troublesome.
 
-4. **Entity Relationships**: How entities relate to each other
+### 4. Cognitive Load Theory (Sweller)
+- Cognitive load: low/medium/high
+- Chunks required: working memory slots (2-7)
+- Element interactivity: low/medium/high
 
-For each skill, assess:
-- Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
-- Whether it's a "threshold concept" (transformative knowledge that unlocks new understanding)
-- Estimated time to learn (in minutes)
-- Difficulty (1-10)
-- IRT parameters for assessment:
-  - difficulty: -3 to +3 (0 = average)
-  - discrimination: 0.5 to 2.5
-  - guessing: 0 to 0.5
-- Cognitive load estimate
-- Common misconceptions students might have
-- Keywords for the skill
+### 5. Instructional Scaffolding (Vygotsky/Wood)
+- Level 1: Full worked examples
+- Level 2: Partial solutions
+- Level 3: Hints on request
+- Level 4: Independent practice
 
-TEXT TO ANALYZE:
+### 6. Mastery Learning (Bloom)
+- Mastery threshold: 0.80 standard, 0.90 for threshold concepts
+
+## SKILLS EXTRACTION
+
+Extract ALL learnable skills with FULL metadata. Be GRANULAR: 5-45 minutes per skill.
+
+## PREREQUISITES - CRITICAL
+
+Every non-foundational skill MUST have prerequisites. Use strength: required/recommended/helpful.
+
+## CONTENT TO ANALYZE
+
 ${text}
 
-Respond with valid JSON:
+## OUTPUT FORMAT (JSON)
+
 {
   "skills": [
     {
-      "name": "string (unique, descriptive name)",
-      "description": "string (1-2 sentences explaining the skill)",
+      "name": "Specific skill name",
+      "description": "What will the learner know/do?",
       "bloomLevel": 1-6,
-      "estimatedMinutes": number,
+      "secondaryBloomLevels": [],
+      "estimatedMinutes": 5-45,
       "difficulty": 1-10,
-      "irt": {
-        "difficulty": -3 to +3,
-        "discrimination": 0.5 to 2.5,
-        "guessing": 0 to 0.5
-      },
-      "isThresholdConcept": boolean,
-      "cognitiveLoadEstimate": "low" | "medium" | "high",
-      "commonMisconceptions": ["misconception 1", "misconception 2"],
-      "keywords": ["relevant keywords"]
+      "irt": { "difficulty": -3 to +3, "discrimination": 0.5-2.5, "guessing": 0-0.5 },
+      "isThresholdConcept": true/false,
+      "thresholdProperties": { "unlocksDomains": [], "troublesomeAspects": [] },
+      "cognitiveLoadEstimate": "low|medium|high",
+      "chunksRequired": 2-7,
+      "elementInteractivity": "low|medium|high",
+      "masteryThreshold": 0.80,
+      "assessmentTypes": ["formative", "summative"],
+      "suggestedAssessments": [{ "type": "formative", "description": "", "bloomAlignment": [1,2] }],
+      "reviewIntervals": [1, 3, 7, 14, 30, 60],
+      "scaffoldingLevels": { "level1": "", "level2": "", "level3": "", "level4": "" },
+      "commonMisconceptions": [],
+      "transferDomains": [],
+      "keywords": [],
+      "domain": "",
+      "subdomain": ""
     }
   ],
   "prerequisites": [
     {
-      "fromSkillName": "prerequisite skill name (must be learned FIRST)",
-      "toSkillName": "dependent skill name (requires the prerequisite)",
-      "strength": "required" | "recommended" | "helpful",
-      "reasoning": "why this prerequisite relationship exists"
+      "fromSkillName": "prerequisite (learned FIRST)",
+      "toSkillName": "dependent skill",
+      "strength": "required|recommended|helpful",
+      "reasoning": "why this dependency"
     }
   ],
-  "entities": [
-    {
-      "name": "entity name",
-      "type": "concept" | "person" | "event" | "place" | "term" | "formula" | "other",
-      "description": "brief description"
-    }
-  ],
-  "entityRelationships": [
-    {
-      "fromEntityName": "source entity",
-      "toEntityName": "target entity",
-      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of",
-      "description": "optional description"
-    }
-  ]
+  "entities": [{ "name": "", "type": "concept|person|term|formula|other", "description": "" }],
+  "entityRelationships": [{ "fromEntityName": "", "toEntityName": "", "type": "related_to|part_of|causes", "description": "" }]
 }
 
-GUIDELINES:
-- Focus on creating a USEFUL learning graph, not just a literal extraction
-- Include obvious prerequisites even if not explicitly mentioned in the text
-- Use your expertise as a curriculum designer - add foundational skills that learners would need
-- A truly foundational skill (like basic arithmetic) doesn't need prerequisites
-- Be thorough - analyze the entire content
-- The graph should help a learner understand the progression of skills`
+## VALIDATION
+
+✓ Every skill has IRT params, cognitive load, scaffolding levels
+✓ Threshold concepts have unlocksDomains and troublesomeAspects
+✓ Every non-foundational skill has prerequisites
+✓ Graph is CONNECTED - no isolated skills`
 
   console.log(`[BackgroundExtraction] Calling Gemini API with ${text.length} chars`)
   const startTime = Date.now()
@@ -294,24 +324,51 @@ GUIDELINES:
 
   const now = Date.now()
 
-  // Transform to typed result
+  // Helper to validate Bloom level
+  const validateBloomLevel = (level: number): number => Math.min(6, Math.max(1, Math.round(level || 2)))
+
+  // Transform to typed result with full educational psychology metadata
   const skills = (parsed.skills || []).map((s, idx) => ({
     id: `skill_${notebookId}_${now}_${idx}`,
     name: s.name,
     description: s.description,
     notebookId,
-    bloomLevel: Math.min(6, Math.max(1, Math.round(s.bloomLevel || 2))),
+    bloomLevel: validateBloomLevel(s.bloomLevel),
+    secondaryBloomLevels: s.secondaryBloomLevels?.map(validateBloomLevel),
     estimatedMinutes: s.estimatedMinutes ? Math.min(120, Math.max(5, s.estimatedMinutes)) : 30,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
+    // IRT 3PL model parameters
     irt: s.irt ? {
       difficulty: Math.min(3, Math.max(-3, s.irt.difficulty || 0)),
       discrimination: Math.min(2.5, Math.max(0.5, s.irt.discrimination || 1)),
       guessing: Math.min(0.5, Math.max(0, s.irt.guessing || 0.2)),
     } : undefined,
+    // Threshold concepts
     isThresholdConcept: s.isThresholdConcept || false,
+    thresholdProperties: s.thresholdProperties,
+    // Cognitive load theory
     cognitiveLoadEstimate: s.cognitiveLoadEstimate || 'medium',
+    elementInteractivity: s.elementInteractivity,
+    chunksRequired: s.chunksRequired ? Math.min(7, Math.max(2, s.chunksRequired)) : undefined,
+    // Mastery learning
+    masteryThreshold: s.masteryThreshold || (s.isThresholdConcept ? 0.90 : 0.80),
+    assessmentTypes: s.assessmentTypes,
+    suggestedAssessments: s.suggestedAssessments?.map(a => ({
+      type: a.type,
+      description: a.description,
+      bloomAlignment: a.bloomAlignment?.map(validateBloomLevel) || [],
+    })),
+    // Spaced repetition
+    reviewIntervals: s.reviewIntervals || [1, 3, 7, 14, 30, 60],
+    // Scaffolding
+    scaffoldingLevels: s.scaffoldingLevels,
+    // Misconceptions & transfer
     commonMisconceptions: s.commonMisconceptions || [],
+    transferDomains: s.transferDomains || [],
+    // Categorization
     keywords: s.keywords || [],
+    domain: s.domain,
+    subdomain: s.subdomain,
     sourceDocumentId,
     createdAt: now,
     updatedAt: now,
@@ -398,7 +455,7 @@ async function storeInNeo4J(
       { sourceId }
     )
 
-    // Store skills
+    // Store skills with full educational psychology metadata
     for (const skill of result.skills) {
       await session.run(
         `
@@ -409,15 +466,27 @@ async function storeInNeo4J(
           notebookId: $notebookId,
           sourceDocumentId: $sourceDocumentId,
           bloomLevel: $bloomLevel,
+          secondaryBloomLevels: $secondaryBloomLevels,
           difficulty: $difficulty,
           estimatedMinutes: $estimatedMinutes,
-          isThresholdConcept: $isThresholdConcept,
-          cognitiveLoadEstimate: $cognitiveLoadEstimate,
           irtDifficulty: $irtDifficulty,
           irtDiscrimination: $irtDiscrimination,
           irtGuessing: $irtGuessing,
-          keywords: $keywords,
+          isThresholdConcept: $isThresholdConcept,
+          thresholdProperties: $thresholdProperties,
+          cognitiveLoadEstimate: $cognitiveLoadEstimate,
+          elementInteractivity: $elementInteractivity,
+          chunksRequired: $chunksRequired,
+          masteryThreshold: $masteryThreshold,
+          assessmentTypes: $assessmentTypes,
+          suggestedAssessments: $suggestedAssessments,
+          reviewIntervals: $reviewIntervals,
+          scaffoldingLevels: $scaffoldingLevels,
           commonMisconceptions: $commonMisconceptions,
+          transferDomains: $transferDomains,
+          keywords: $keywords,
+          domain: $domain,
+          subdomain: $subdomain,
           createdAt: $createdAt,
           updatedAt: $updatedAt
         })
@@ -429,15 +498,27 @@ async function storeInNeo4J(
           notebookId: skill.notebookId,
           sourceDocumentId: skill.sourceDocumentId,
           bloomLevel: skill.bloomLevel,
+          secondaryBloomLevels: skill.secondaryBloomLevels || [],
           difficulty: skill.difficulty,
           estimatedMinutes: skill.estimatedMinutes,
-          isThresholdConcept: skill.isThresholdConcept,
-          cognitiveLoadEstimate: skill.cognitiveLoadEstimate,
           irtDifficulty: skill.irt?.difficulty ?? 0,
           irtDiscrimination: skill.irt?.discrimination ?? 1,
           irtGuessing: skill.irt?.guessing ?? 0.2,
-          keywords: skill.keywords,
-          commonMisconceptions: skill.commonMisconceptions,
+          isThresholdConcept: skill.isThresholdConcept,
+          thresholdProperties: skill.thresholdProperties ? JSON.stringify(skill.thresholdProperties) : null,
+          cognitiveLoadEstimate: skill.cognitiveLoadEstimate,
+          elementInteractivity: skill.elementInteractivity || null,
+          chunksRequired: skill.chunksRequired || null,
+          masteryThreshold: skill.masteryThreshold || 0.80,
+          assessmentTypes: skill.assessmentTypes || [],
+          suggestedAssessments: skill.suggestedAssessments ? JSON.stringify(skill.suggestedAssessments) : null,
+          reviewIntervals: skill.reviewIntervals || [1, 3, 7, 14, 30, 60],
+          scaffoldingLevels: skill.scaffoldingLevels ? JSON.stringify(skill.scaffoldingLevels) : null,
+          commonMisconceptions: skill.commonMisconceptions || [],
+          transferDomains: skill.transferDomains || [],
+          keywords: skill.keywords || [],
+          domain: skill.domain || null,
+          subdomain: skill.subdomain || null,
           createdAt: skill.createdAt,
           updatedAt: skill.updatedAt,
         }
