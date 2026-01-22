@@ -55,58 +55,48 @@ export async function extractFromText(
 
   console.log(`[Extraction] Starting extraction for ${text.length} chars`)
 
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a COMPREHENSIVE knowledge graph.
+  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
 
-IMPORTANT: Extract MANY skills (aim for 10-20+ per chunk of content) and MANY prerequisite relationships. Every skill should have at least one prerequisite or be a prerequisite for another skill. The goal is a rich, interconnected graph.
+Your goal is QUALITY and ACCURACY - extract the skills and relationships that are genuinely present in this content.
 
 Extract:
-1. **Skills/Concepts** (EXTRACT MANY - every topic, subtopic, technique, formula, concept, and procedure):
-   - Each section heading = at least 1 skill
-   - Each formula or technique = 1 skill
-   - Each concept or term = 1 skill
-   - Different levels of the same topic = separate skills (e.g., "Understanding Mean" vs "Calculating Mean" vs "Interpreting Mean")
+1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures in this content
+   - What does a learner need to know or be able to do after studying this?
+   - Include both knowledge (understanding concepts) and abilities (applying techniques)
 
-2. **Prerequisites** (CRITICAL - create a rich web of relationships):
-   - Basic concepts → Advanced concepts
-   - Definitions → Applications
-   - Theory → Practice
-   - Lower Bloom levels → Higher Bloom levels
-   - ALWAYS create prerequisite chains, never isolated skills
+2. **Prerequisites**: The actual dependency relationships between skills
+   - Which skills must be learned before others?
+   - Only include relationships that genuinely exist in the content
+   - Consider: Does skill A actually need to be understood before skill B?
 
-3. **Entities**: Key terms, people, events, formulas, theorems mentioned
+3. **Entities**: Key terms, people, formulas, theorems, and important references
 
-4. **Entity Relationships**: How entities relate to skills and each other
+4. **Entity Relationships**: How entities relate to each other
 
-For each skill, determine:
+For each skill, assess:
 - Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
-- Whether it's a "threshold concept" (transformative, troublesome knowledge that unlocks new understanding)
+- Whether it's a "threshold concept" (transformative knowledge that unlocks new understanding)
 - Estimated time to learn (in minutes)
 - Difficulty (1-10)
-- IRT parameters (Item Response Theory 3PL model):
-  - difficulty: -3 to +3 (0 = average, positive = harder)
-  - discrimination: 0.5 to 2.5 (how well it differentiates learner ability)
-  - guessing: 0 to 0.5 (probability of guessing correctly, lower for open-ended)
-- Cognitive load (low/medium/high) and element interactivity
-- Working memory chunks required (2-7, based on Miller's Law)
-- Mastery threshold (0.80 for regular skills, 0.90 for threshold concepts)
+- IRT parameters for assessment:
+  - difficulty: -3 to +3 (0 = average)
+  - discrimination: 0.5 to 2.5
+  - guessing: 0 to 0.5
+- Cognitive load estimate
 - Common misconceptions students might have
-- Transfer domains (where else this skill applies)
-- Suggested assessments aligned with Bloom's level
-- Spaced repetition review intervals (in days)
-- Scaffolding levels (worked examples → hints → independent practice)
+- Keywords for the skill
 ${existingContext}
 
 TEXT TO ANALYZE:
 ${text}
 
-Respond with valid JSON matching this structure:
+Respond with valid JSON:
 {
   "skills": [
     {
       "name": "string (unique, descriptive name)",
       "description": "string (1-2 sentences explaining the skill)",
       "bloomLevel": 1-6,
-      "secondaryBloomLevels": [optional array of 1-6],
       "estimatedMinutes": number,
       "difficulty": 1-10,
       "irt": {
@@ -115,48 +105,23 @@ Respond with valid JSON matching this structure:
         "guessing": 0 to 0.5
       },
       "isThresholdConcept": boolean,
-      "thresholdProperties": {
-        "unlocksDomains": ["optional array of domains this unlocks"],
-        "troublesomeAspects": ["what makes this concept difficult"]
-      },
       "cognitiveLoadEstimate": "low" | "medium" | "high",
-      "elementInteractivity": "low" | "medium" | "high",
-      "chunksRequired": 2-7,
-      "masteryThreshold": 0.80 or 0.90,
       "commonMisconceptions": ["misconception 1", "misconception 2"],
-      "transferDomains": ["domain where skill transfers"],
-      "assessmentTypes": ["formative", "summative", "performance", "diagnostic", "peer"],
-      "suggestedAssessments": [
-        {
-          "type": "formative" | "summative" | "performance" | "diagnostic" | "peer",
-          "description": "specific assessment activity",
-          "bloomAlignment": [1-6]
-        }
-      ],
-      "reviewIntervals": [1, 3, 7, 14, 30, 60],
-      "scaffoldingLevels": {
-        "level1": "Full worked example description",
-        "level2": "Partial solution description",
-        "level3": "Hints on request description",
-        "level4": "Independent practice description"
-      },
-      "keywords": ["relevant keywords"],
-      "domain": "optional domain classification",
-      "subdomain": "optional subdomain"
+      "keywords": ["relevant keywords"]
     }
   ],
   "prerequisites": [
     {
-      "fromSkillName": "prerequisite skill name",
-      "toSkillName": "dependent skill name",
+      "fromSkillName": "prerequisite skill name (must be learned FIRST)",
+      "toSkillName": "dependent skill name (requires the prerequisite)",
       "strength": "required" | "recommended" | "helpful",
-      "reasoning": "why this prerequisite exists"
+      "reasoning": "why this prerequisite relationship exists"
     }
   ],
   "entities": [
     {
       "name": "entity name",
-      "type": "concept" | "person" | "event" | "place" | "term" | "other",
+      "type": "concept" | "person" | "event" | "place" | "term" | "formula" | "other",
       "description": "brief description"
     }
   ],
@@ -165,19 +130,17 @@ Respond with valid JSON matching this structure:
       "fromEntityName": "source entity",
       "toEntityName": "target entity",
       "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of",
-      "description": "optional description of relationship"
+      "description": "optional description"
     }
   ],
   "existingSkillReferences": ["names of existing skills referenced in this text"]
 }
 
-IMPORTANT GUIDELINES:
-- Extract MANY skills (10-20+) - err on the side of MORE extraction, not less
-- EVERY skill must connect to at least one other skill via prerequisite
-- Create prerequisite CHAINS: A → B → C → D, not just isolated pairs
-- Different cognitive levels of same topic = different skills (Remember X, Understand X, Apply X)
-- Include both theoretical knowledge AND practical skills
-- Extract ALL formulas, techniques, procedures as separate skills`
+GUIDELINES:
+- Focus on QUALITY - extract skills that genuinely represent what a learner needs to master
+- Include prerequisite relationships where they actually exist in the content
+- A skill without prerequisites is fine if it's foundational
+- Be thorough - analyze the entire content, don't skip sections`
 
   let response
   try {
@@ -395,10 +358,6 @@ async function extractFromTextChunked(
     }
   }
 
-  // Now infer cross-chunk prerequisites based on Bloom levels
-  const inferredPrereqs = inferCrossChunkPrerequisites(allResults.skills)
-  allResults.prerequisites.push(...inferredPrereqs)
-
   // Deduplicate
   allResults.skills = deduplicateSkills(allResults.skills)
   allResults.entities = deduplicateEntities(allResults.entities)
@@ -424,45 +383,34 @@ async function extractFromTextDirect(
     ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
     : ''
 
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a COMPREHENSIVE knowledge graph.
+  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
 
-IMPORTANT: Extract MANY skills (aim for 10-20+ per chunk of content) and MANY prerequisite relationships. Every skill should have at least one prerequisite or be a prerequisite for another skill. The goal is a rich, interconnected graph.
+Your goal is QUALITY and ACCURACY - extract the skills and relationships that are genuinely present in this content.
 
 Extract:
-1. **Skills/Concepts** (EXTRACT MANY - every topic, subtopic, technique, formula, concept, and procedure):
-   - Each section heading = at least 1 skill
-   - Each formula or technique = 1 skill
-   - Each concept or term = 1 skill
-   - Different levels of the same topic = separate skills (e.g., "Understanding Mean" vs "Calculating Mean" vs "Interpreting Mean")
+1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
+   - What does a learner need to know or be able to do?
+   - Include both knowledge (understanding) and abilities (application)
 
-2. **Prerequisites** (CRITICAL - create a rich web of relationships):
-   - Basic concepts → Advanced concepts
-   - Definitions → Applications
-   - Theory → Practice
-   - Lower Bloom levels → Higher Bloom levels
-   - ALWAYS create prerequisite chains, never isolated skills
+2. **Prerequisites**: The actual dependency relationships between skills
+   - Which skills must be learned before others?
+   - Only include relationships that genuinely exist
+   - A skill without prerequisites is fine if it's foundational
 
-3. **Entities**: Key terms, people, events, formulas, theorems mentioned
+3. **Entities**: Key terms, people, formulas, theorems mentioned
 
-4. **Entity Relationships**: How entities relate to skills and each other
-
-For each skill, determine:
-- Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
-- Whether it's a "threshold concept" (transformative, troublesome knowledge that unlocks new understanding)
-- Estimated time to learn (in minutes)
-- Difficulty (1-10)
-- Keywords for the skill
+4. **Entity Relationships**: How entities relate to each other
 ${existingContext}
 
 TEXT TO ANALYZE:
 ${text}
 
-Respond with valid JSON matching this structure:
+Respond with valid JSON:
 {
   "skills": [
     {
       "name": "string (unique, descriptive name)",
-      "description": "string (1-2 sentences explaining the skill)",
+      "description": "string (1-2 sentences)",
       "bloomLevel": 1-6,
       "estimatedMinutes": number,
       "difficulty": 1-10,
@@ -472,10 +420,10 @@ Respond with valid JSON matching this structure:
   ],
   "prerequisites": [
     {
-      "fromSkillName": "prerequisite skill name (what must be learned FIRST)",
-      "toSkillName": "dependent skill name (what requires the prerequisite)",
+      "fromSkillName": "prerequisite skill (learned FIRST)",
+      "toSkillName": "dependent skill (requires the prerequisite)",
       "strength": "required" | "recommended" | "helpful",
-      "reasoning": "why this prerequisite exists"
+      "reasoning": "why this relationship exists"
     }
   ],
   "entities": [
@@ -489,20 +437,16 @@ Respond with valid JSON matching this structure:
     {
       "fromEntityName": "source entity",
       "toEntityName": "target entity",
-      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of",
-      "description": "optional description of relationship"
+      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of"
     }
   ],
-  "existingSkillReferences": ["names of existing skills referenced in this text"]
+  "existingSkillReferences": ["names of existing skills referenced"]
 }
 
-IMPORTANT GUIDELINES:
-- Extract MANY skills (10-20+) - err on the side of MORE extraction, not less
-- EVERY skill must connect to at least one other skill via prerequisite
-- Create prerequisite CHAINS: A → B → C → D, not just isolated pairs
-- Different cognitive levels of same topic = different skills (Remember X, Understand X, Apply X)
-- Include both theoretical knowledge AND practical skills
-- Extract ALL formulas, techniques, procedures as separate skills`
+GUIDELINES:
+- Focus on QUALITY - extract skills that genuinely represent what a learner needs to master
+- Include prerequisite relationships where they actually exist
+- Be thorough - analyze the entire content`
 
   let response
   try {
@@ -512,7 +456,7 @@ IMPORTANT GUIDELINES:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.3, // Slightly higher for more creative extraction
+        temperature: 0.2,
       },
     })
     console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
