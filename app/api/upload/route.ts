@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractText } from "unpdf";
-import { createClient } from "@/lib/supabase/server";
-import { createSource, processSource } from "@/lib/pipeline/process";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 // Configure body size limit for PDF uploads
 export const config = {
@@ -37,6 +36,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 400 });
     }
 
+    console.log(`[Upload] Processing file: ${file.name}, size: ${file.size}`);
+    const startTime = Date.now();
+
     let text = "";
     let totalPages = 1;
 
@@ -54,9 +56,12 @@ export async function POST(request: NextRequest) {
       totalPages = result.totalPages;
     }
 
+    console.log(`[Upload] Text extracted in ${Date.now() - startTime}ms, length: ${text.length}`);
+
     const title = file.name.replace(/\.(pdf|txt)$/i, "");
 
-    // If notebookId is provided, process through the RAG pipeline
+    // If notebookId is provided, create source record and save text
+    // Processing will happen in a separate request to avoid timeout
     if (notebookId) {
       const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -77,39 +82,38 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Notebook not found" }, { status: 404 });
       }
 
-      // Create source record
-      const sourceId = await createSource({
-        notebookId,
-        userId: user.id,
-        sourceType: isPDF ? "pdf" : "txt",
-        filename: file.name,
-        title,
-      });
+      // Create source record with text (status: pending)
+      // Client will call /api/notebooks/[id]/sources/[sourceId]/process
+      const adminSupabase = createAdminClient();
+      const { data: source, error: sourceError } = await adminSupabase
+        .from("sources")
+        .insert({
+          notebook_id: notebookId,
+          user_id: user.id,
+          source_type: isPDF ? "pdf" : "txt",
+          filename: file.name,
+          title,
+          raw_text: text, // Save text immediately
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
-      // Process through pipeline - MUST await on serverless (Netlify kills context after response)
-      console.log(`[Upload] Starting pipeline processing for source ${sourceId}`);
-      const result = await processSource({
-        sourceId,
-        notebookId,
-        userId: user.id,
-        text,
-        title,
-        filename: file.name,
-        sourceType: isPDF ? "pdf" : "txt",
-      });
-      console.log(`[Upload] Pipeline completed for source ${sourceId}:`, result);
+      if (sourceError || !source) {
+        console.error("[Upload] Failed to create source:", sourceError);
+        return NextResponse.json({ error: "Failed to create source" }, { status: 500 });
+      }
+
+      console.log(`[Upload] Created source ${source.id}, returning for client to trigger processing`);
 
       return NextResponse.json({
-        sourceId,
+        sourceId: source.id,
         title,
         text,
         content: text,
         filename: file.name,
         pages: totalPages,
-        processing: false,
-        success: result.success,
-        chunkCount: result.chunkCount,
-        graphExtracted: result.graphExtracted,
+        needsProcessing: true, // Signal to client to call process endpoint
       });
     }
 

@@ -5,5 +5,15 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Increase function timeout for heavy processing (scraping, embeddings)
+# Default is 10s, Pro plans allow up to 26s
+[functions]
+  external_node_modules = ["unpdf"]
+  node_bundler = "esbuild"
+
+[functions."api/*"]
+  # Maximum timeout for API routes (26s on Pro, 10s on Free)
+  timeout = 26
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

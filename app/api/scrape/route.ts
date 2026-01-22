@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Hyperbrowser } from "@hyperbrowser/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { createSource, processSource } from "@/lib/pipeline/process";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +24,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`[Scrape] Starting scrape for URL: ${url}`);
+    const startTime = Date.now();
+
     const client = new Hyperbrowser({ apiKey });
 
     const scrapeResult = await client.scrape.startAndWait({
@@ -35,13 +38,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log(`[Scrape] Hyperbrowser scrape completed in ${Date.now() - startTime}ms`);
+
     // Extract data from the result
     const data = scrapeResult.data as any;
     const title = data?.metadata?.title || new URL(url).hostname;
     const content = data?.markdown || data?.text || "";
     const text = data?.text || data?.markdown || "";
 
-    // If notebookId is provided, process through the RAG pipeline
+    // If notebookId is provided, create source record and save text
+    // Processing will happen in a separate request to avoid timeout
     if (notebookId) {
       const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -62,40 +68,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Notebook not found" }, { status: 404 });
       }
 
-      // Create source record
-      const sourceId = await createSource({
-        notebookId,
-        userId: user.id,
-        sourceType: "url",
-        url,
-        title,
-      });
+      // Create source record with scraped text (status: pending)
+      // The client will call /api/notebooks/[id]/sources/[sourceId]/process to complete
+      const adminSupabase = createAdminClient();
+      const { data: source, error: sourceError } = await adminSupabase
+        .from("sources")
+        .insert({
+          notebook_id: notebookId,
+          user_id: user.id,
+          source_type: "url",
+          url,
+          title,
+          raw_text: text, // Save text immediately so processing endpoint can use it
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
-      // Process through pipeline - MUST await on serverless (Netlify kills context after response)
-      // The processSource function is already optimized to mark success before graph extraction
-      // so even if graph extraction times out, the source will be marked complete
-      console.log(`[Scrape] Starting pipeline processing for source ${sourceId}`);
-      const result = await processSource({
-        sourceId,
-        notebookId,
-        userId: user.id,
-        text,
-        title,
-        url,
-        sourceType: "url",
-      });
-      console.log(`[Scrape] Pipeline completed for source ${sourceId}:`, result);
+      if (sourceError || !source) {
+        console.error("[Scrape] Failed to create source:", sourceError);
+        return NextResponse.json({ error: "Failed to create source" }, { status: 500 });
+      }
+
+      console.log(`[Scrape] Created source ${source.id}, returning for client to trigger processing`);
 
       return NextResponse.json({
-        sourceId,
+        sourceId: source.id,
         title,
         content,
         text,
         url,
-        processing: false,
-        success: result.success,
-        chunkCount: result.chunkCount,
-        graphExtracted: result.graphExtracted,
+        needsProcessing: true, // Signal to client to call process endpoint
       });
     }
 

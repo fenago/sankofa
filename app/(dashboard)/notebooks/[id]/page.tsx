@@ -130,19 +130,47 @@ export default function NotebookPage({ params }: NotebookPageProps) {
     setIsScraping(true)
 
     try {
-      const res = await fetch('/api/scrape', {
+      // Step 1: Scrape the URL (fast - just fetches content)
+      const scrapeRes = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, notebookId }),
       })
 
-      const data = await res.json()
+      const scrapeData = await scrapeRes.json()
 
-      if (!res.ok) throw new Error(data.error || 'Failed to scrape')
+      if (!scrapeRes.ok) throw new Error(scrapeData.error || 'Failed to scrape')
 
-      // Refresh sources from server to get the new source
+      // Refresh sources immediately so user sees it in "pending" state
       invalidateSources(notebookId)
-      toast({ title: 'Source added successfully' })
+
+      // Step 2: Process the source (chunking, embeddings) in a separate request
+      // This allows each step to have its own timeout budget
+      if (scrapeData.needsProcessing && scrapeData.sourceId) {
+        const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${scrapeData.sourceId}/process`, {
+          method: 'POST',
+        })
+
+        const processData = await processRes.json()
+
+        if (!processRes.ok) {
+          console.error('Processing failed:', processData.error)
+          // Don't throw - source was created, just processing failed
+          // User can retry or the source will show as error
+          toast({
+            title: 'Source scraped but processing failed',
+            description: processData.error || 'Will retry automatically',
+            variant: 'destructive',
+          })
+        } else {
+          toast({ title: 'Source added successfully' })
+        }
+
+        // Refresh again to get final status
+        invalidateSources(notebookId)
+      } else {
+        toast({ title: 'Source added successfully' })
+      }
     } catch (error) {
       console.error(error)
       toast({
@@ -159,26 +187,51 @@ export default function NotebookPage({ params }: NotebookPageProps) {
     setIsScraping(true)
 
     try {
+      // Step 1: Upload and extract text (fast)
       const formData = new FormData()
       formData.append('file', file)
       formData.append('notebookId', notebookId)
 
-      const res = await fetch('/api/upload', {
+      const uploadRes = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
-      const data = await res.json()
+      const uploadData = await uploadRes.json()
 
-      if (!res.ok) throw new Error(data.error || 'Failed to upload PDF')
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload file')
 
-      // Refresh sources from server to get the new source
+      // Refresh sources immediately so user sees it in "pending" state
       invalidateSources(notebookId)
-      toast({ title: 'PDF added successfully' })
+
+      // Step 2: Process the source (chunking, embeddings) in a separate request
+      if (uploadData.needsProcessing && uploadData.sourceId) {
+        const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${uploadData.sourceId}/process`, {
+          method: 'POST',
+        })
+
+        const processData = await processRes.json()
+
+        if (!processRes.ok) {
+          console.error('Processing failed:', processData.error)
+          toast({
+            title: 'File uploaded but processing failed',
+            description: processData.error || 'Will retry automatically',
+            variant: 'destructive',
+          })
+        } else {
+          toast({ title: 'File added successfully' })
+        }
+
+        // Refresh again to get final status
+        invalidateSources(notebookId)
+      } else {
+        toast({ title: 'File added successfully' })
+      }
     } catch (error) {
       console.error(error)
       toast({
-        title: 'Failed to add PDF',
+        title: 'Failed to add file',
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       })
