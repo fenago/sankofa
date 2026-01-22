@@ -184,6 +184,9 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
   const handleExtractGraph = async (sourceId: string) => {
     if (!notebookId) return;
 
+    // Track jobId locally so we have it even if state update hasn't completed
+    let localJobId: string | null = null;
+
     setGraphStatuses(prev => ({
       ...prev,
       [sourceId]: { ...prev[sourceId], extracting: true, error: undefined, jobStatus: 'pending', extractionStartedAt: Date.now() }
@@ -221,6 +224,7 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
             console.log(`[SourcesPanel] Stream event:`, event.status, event);
 
             if (event.status === 'extracting') {
+              localJobId = event.jobId; // Track locally
               setGraphStatuses(prev => ({
                 ...prev,
                 [sourceId]: {
@@ -272,6 +276,17 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
           }
         }
       }
+
+      // Stream ended - if we had a job but never got 'complete', check status
+      // This handles cases where the stream times out before completion
+      if (localJobId) {
+        const currentStatus = graphStatuses[sourceId];
+        if (currentStatus?.extracting && currentStatus?.jobStatus !== 'completed') {
+          console.log('[SourcesPanel] Stream ended without complete event, checking job status...');
+          // Keep extracting true to maintain polling, and trigger a status check
+          setTimeout(() => fetchGraphStatus(sourceId), 1000);
+        }
+      }
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
 
@@ -279,7 +294,8 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
       const isNetworkError = err instanceof TypeError &&
         (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch'));
 
-      if (isNetworkError && graphStatuses[sourceId]?.jobId) {
+      // Use localJobId (tracked during streaming) since state update might not have completed
+      if (isNetworkError && localJobId) {
         // Network error but job was started - poll to check actual status
         console.log('[SourcesPanel] Network error during streaming, checking job status...');
         setGraphStatuses(prev => ({
