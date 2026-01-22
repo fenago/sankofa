@@ -358,14 +358,27 @@ async function extractFromTextChunked(
     }
   }
 
-  // Deduplicate
+  // Deduplicate skills first
   allResults.skills = deduplicateSkills(allResults.skills)
   allResults.entities = deduplicateEntities(allResults.entities)
-  allResults.prerequisites = deduplicatePrerequisites(allResults.prerequisites)
 
-  // Infer cross-chunk prerequisites based on Bloom levels
-  const crossChunkPrereqs = inferCrossChunkPrerequisites(allResults.skills)
-  allResults.prerequisites.push(...crossChunkPrereqs)
+  console.log(`[Extraction] Merged ${allResults.skills.length} unique skills from ${chunks.length} chunks`)
+  console.log(`[Extraction] Initial prerequisites: ${allResults.prerequisites.length}`)
+
+  // CRITICAL: Use Gemini to infer prerequisites between ALL skills
+  // This is necessary because parallel chunk processing loses cross-chunk relationships
+  if (allResults.skills.length > 1) {
+    console.log(`[Extraction] Inferring prerequisites between ${allResults.skills.length} skills...`)
+    const inferredPrereqs = await inferPrerequisitesFromSkills(allResults.skills, notebookId)
+    console.log(`[Extraction] Inferred ${inferredPrereqs.length} prerequisites from skill analysis`)
+    allResults.prerequisites.push(...inferredPrereqs)
+  }
+
+  // Also add heuristic-based cross-chunk prerequisites (Bloom level + keywords)
+  const heuristicPrereqs = inferCrossChunkPrerequisites(allResults.skills)
+  allResults.prerequisites.push(...heuristicPrereqs)
+
+  // Deduplicate all prerequisites
   allResults.prerequisites = deduplicatePrerequisites(allResults.prerequisites)
 
   console.log(`[Extraction] Final: ${allResults.skills.length} skills, ${allResults.prerequisites.length} prerequisites`)
@@ -582,6 +595,114 @@ GUIDELINES:
     entities,
     entityRelationships,
     existingSkillReferences: parsed.existingSkillReferences,
+  }
+}
+
+/**
+ * Use Gemini to infer prerequisite relationships between all extracted skills
+ * This is a fast call because it only sends skill names, not full content
+ */
+async function inferPrerequisitesFromSkills(
+  skills: SkillNode[],
+  notebookId: string
+): Promise<PrerequisiteRelationship[]> {
+  if (skills.length < 2) return []
+
+  const ai = getClient()
+
+  // Build a simple list of skills with their IDs and names
+  const skillList = skills.map(s => ({
+    id: s.id,
+    name: s.name,
+    bloomLevel: s.bloomLevel,
+  }))
+
+  const prompt = `You are an expert curriculum designer. Given these ${skills.length} skills extracted from educational content, identify PREREQUISITE relationships between them.
+
+A prerequisite means: Skill A must be learned BEFORE Skill B.
+
+SKILLS:
+${skillList.map((s, i) => `${i + 1}. [${s.id}] "${s.name}" (Bloom L${s.bloomLevel})`).join('\n')}
+
+Identify ALL prerequisite relationships. Be thorough - if one skill builds on concepts from another, that's a prerequisite. Consider:
+- Foundational skills needed before advanced ones
+- Conceptual dependencies (must understand X to learn Y)
+- Bloom's level progressions (Remember/Understand before Apply/Analyze)
+- Logical sequencing (data collection before analysis, theory before practice)
+
+Respond with JSON:
+{
+  "prerequisites": [
+    {
+      "fromSkillId": "skill_id (the prerequisite - learned FIRST)",
+      "toSkillId": "skill_id (the dependent - requires the prerequisite)",
+      "strength": "required" | "recommended" | "helpful",
+      "reasoning": "brief reason for this relationship"
+    }
+  ]
+}
+
+IMPORTANT: Use the EXACT skill IDs provided in brackets [skill_xxx].
+Generate at least ${Math.min(skills.length * 2, 50)} relationships if possible.`
+
+  try {
+    const startTime = Date.now()
+    const response = await ai.models.generateContent({
+      model: EXTRACTION_MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+      },
+    })
+    console.log(`[Extraction] Prerequisite inference completed in ${Date.now() - startTime}ms`)
+
+    const responseText = response.text
+    if (!responseText) {
+      console.error('[Extraction] Empty response from prerequisite inference')
+      return []
+    }
+
+    let parsed: { prerequisites?: { fromSkillId: string; toSkillId: string; strength?: string; reasoning?: string }[] }
+    try {
+      parsed = JSON.parse(responseText)
+    } catch {
+      const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[1])
+      } else {
+        console.error('[Extraction] Failed to parse prerequisite inference response')
+        return []
+      }
+    }
+
+    // Validate skill IDs exist
+    const validSkillIds = new Set(skills.map(s => s.id))
+
+    const prerequisites: PrerequisiteRelationship[] = (parsed.prerequisites || [])
+      .filter(p => {
+        const fromValid = validSkillIds.has(p.fromSkillId)
+        const toValid = validSkillIds.has(p.toSkillId)
+        if (!fromValid || !toValid) {
+          console.log(`[Extraction] Skipping invalid prerequisite: ${p.fromSkillId} → ${p.toSkillId}`)
+        }
+        return fromValid && toValid && p.fromSkillId !== p.toSkillId
+      })
+      .map(p => ({
+        fromSkillId: p.fromSkillId,
+        toSkillId: p.toSkillId,
+        strength: (p.strength || 'recommended') as PrerequisiteRelationship['strength'],
+        confidenceScore: 0.85,
+        reasoning: p.reasoning,
+        inferenceMethod: 'llm_inferred' as const,
+      }))
+
+    console.log(`[Extraction] Validated ${prerequisites.length} prerequisite relationships`)
+    return prerequisites
+
+  } catch (error) {
+    console.error('[Extraction] Failed to infer prerequisites:', error)
+    return []
   }
 }
 
