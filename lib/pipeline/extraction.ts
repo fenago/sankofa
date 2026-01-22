@@ -57,17 +57,18 @@ export async function extractFromText(
 
   const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
 
-Your goal is QUALITY and ACCURACY - extract the skills and relationships that are genuinely present in this content.
+Your goal is to create a USEFUL and ACCURATE knowledge graph for learning.
 
 Extract:
-1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures in this content
+1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
    - What does a learner need to know or be able to do after studying this?
    - Include both knowledge (understanding concepts) and abilities (applying techniques)
+   - Use your expertise: if an obvious foundational skill is needed but not explicitly stated, include it
 
-2. **Prerequisites**: The actual dependency relationships between skills
+2. **Prerequisites**: The dependency relationships between skills
    - Which skills must be learned before others?
-   - Only include relationships that genuinely exist in the content
-   - Consider: Does skill A actually need to be understood before skill B?
+   - Include OBVIOUS prerequisites even if not explicitly stated (e.g., "calculating mean" before "calculating standard deviation")
+   - Use pedagogical judgment - what would a good teacher identify as prerequisites?
 
 3. **Entities**: Key terms, people, formulas, theorems, and important references
 
@@ -137,10 +138,12 @@ Respond with valid JSON:
 }
 
 GUIDELINES:
-- Focus on QUALITY - extract skills that genuinely represent what a learner needs to master
-- Include prerequisite relationships where they actually exist in the content
-- A skill without prerequisites is fine if it's foundational
-- Be thorough - analyze the entire content, don't skip sections`
+- Focus on creating a USEFUL learning graph, not just a literal extraction
+- Include obvious prerequisites even if not explicitly mentioned in the text
+- Use your expertise as a curriculum designer - add foundational skills that learners would need
+- A truly foundational skill (like basic arithmetic) doesn't need prerequisites
+- Be thorough - analyze the entire content
+- The graph should help a learner understand the progression of skills`
 
   let response
   try {
@@ -150,7 +153,7 @@ GUIDELINES:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.2,
+        temperature: 0.3, // Slightly higher for thoughtful additions
       },
     })
     console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
@@ -383,19 +386,21 @@ async function extractFromTextDirect(
     ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
     : ''
 
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
+  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that helps learners understand the progression of skills.
 
-Your goal is QUALITY and ACCURACY - extract the skills and relationships that are genuinely present in this content.
+Your goal is to create a USEFUL and ACCURATE knowledge graph for learning.
 
 Extract:
 1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
    - What does a learner need to know or be able to do?
    - Include both knowledge (understanding) and abilities (application)
+   - Use your expertise: if an obvious foundational skill is needed but not stated, include it
 
-2. **Prerequisites**: The actual dependency relationships between skills
+2. **Prerequisites**: The dependency relationships between skills
    - Which skills must be learned before others?
-   - Only include relationships that genuinely exist
-   - A skill without prerequisites is fine if it's foundational
+   - Include OBVIOUS prerequisites even if not explicitly stated
+   - Use pedagogical judgment - what would a good teacher identify as prerequisites?
+   - A truly foundational skill doesn't need prerequisites
 
 3. **Entities**: Key terms, people, formulas, theorems mentioned
 
@@ -444,9 +449,11 @@ Respond with valid JSON:
 }
 
 GUIDELINES:
-- Focus on QUALITY - extract skills that genuinely represent what a learner needs to master
-- Include prerequisite relationships where they actually exist
-- Be thorough - analyze the entire content`
+- Create a USEFUL learning graph, not just a literal extraction
+- Include obvious prerequisites even if not explicitly mentioned
+- Use your expertise - add foundational skills that learners would need
+- Be thorough - analyze the entire content
+- The graph should help learners understand skill progression`
 
   let response
   try {
@@ -456,7 +463,7 @@ GUIDELINES:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.2,
+        temperature: 0.3,
       },
     })
     console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
