@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { chunkDocument, estimateTokens } from '@/lib/pipeline/chunking'
 import { batchGenerateEmbeddings } from '@/lib/pipeline/embeddings'
-import { extractFromText } from '@/lib/pipeline/extraction'
-import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { storeGraphExtraction } from '@/lib/graph/store'
+// Graph extraction disabled in source processing - too slow for serverless
+// Users can trigger via "Build Graph" button instead
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -117,34 +116,23 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
     console.log(`[Process] Inserted chunks in ${Date.now() - insertStartTime}ms`)
 
-    // Mark as success BEFORE graph extraction (so timeout doesn't leave it stuck)
+    // Mark as success
     await adminSupabase
       .from('sources')
       .update({ status: 'success' })
       .eq('id', sourceId)
 
-    console.log(`[Process] Source ${sourceId} marked success, total time: ${Date.now() - startTime}ms`)
+    const totalTime = Date.now() - startTime
+    console.log(`[Process] Source ${sourceId} complete: ${chunks.length} chunks in ${totalTime}ms`)
 
-    // Graph extraction (optional, can timeout without affecting source status)
-    let graphExtracted = false
-    if (isNeo4JAvailable()) {
-      try {
-        console.log(`[Process] Starting graph extraction for source ${sourceId}`)
-        const graphResult = await extractFromText(text, notebookId, sourceId)
-        await storeGraphExtraction(graphResult)
-        graphExtracted = true
-        console.log(`[Process] Graph extraction complete: ${graphResult.skills.length} skills`)
-      } catch (graphError) {
-        console.error('[Process] Graph extraction failed (continuing):', graphError)
-      }
-    }
+    // Graph extraction is intentionally skipped here - it's too slow for serverless
+    // Users can trigger graph building manually via the "Build Graph" button
 
     return NextResponse.json({
       success: true,
       sourceId,
       chunkCount: chunks.length,
-      graphExtracted,
-      processingTimeMs: Date.now() - startTime,
+      processingTimeMs: totalTime,
     })
   } catch (error) {
     console.error('[Process] Error:', error)

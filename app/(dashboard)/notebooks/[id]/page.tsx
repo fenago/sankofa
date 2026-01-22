@@ -147,26 +147,26 @@ export default function NotebookPage({ params }: NotebookPageProps) {
       // Step 2: Process the source (chunking, embeddings) in a separate request
       // This allows each step to have its own timeout budget
       if (scrapeData.needsProcessing && scrapeData.sourceId) {
-        const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${scrapeData.sourceId}/process`, {
-          method: 'POST',
-        })
-
-        const processData = await processRes.json()
-
-        if (!processRes.ok) {
-          console.error('Processing failed:', processData.error)
-          // Don't throw - source was created, just processing failed
-          // User can retry or the source will show as error
-          toast({
-            title: 'Source scraped but processing failed',
-            description: processData.error || 'Will retry automatically',
-            variant: 'destructive',
+        try {
+          const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${scrapeData.sourceId}/process`, {
+            method: 'POST',
           })
-        } else {
-          toast({ title: 'Source added successfully' })
+
+          if (processRes.ok) {
+            toast({ title: 'Source added successfully' })
+          } else {
+            // 502/504 often means timeout but processing may still complete
+            // Don't show error - let the UI polling show the final status
+            console.log('Process request returned non-OK, but processing may have completed')
+            toast({ title: 'Source added - processing in background' })
+          }
+        } catch (processError) {
+          // Network error or timeout - processing may still complete server-side
+          console.log('Process request failed, but processing may have completed:', processError)
+          toast({ title: 'Source added - processing in background' })
         }
 
-        // Refresh again to get final status
+        // Refresh to get current status (may still be processing)
         invalidateSources(notebookId)
       } else {
         toast({ title: 'Source added successfully' })
@@ -206,24 +206,25 @@ export default function NotebookPage({ params }: NotebookPageProps) {
 
       // Step 2: Process the source (chunking, embeddings) in a separate request
       if (uploadData.needsProcessing && uploadData.sourceId) {
-        const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${uploadData.sourceId}/process`, {
-          method: 'POST',
-        })
-
-        const processData = await processRes.json()
-
-        if (!processRes.ok) {
-          console.error('Processing failed:', processData.error)
-          toast({
-            title: 'File uploaded but processing failed',
-            description: processData.error || 'Will retry automatically',
-            variant: 'destructive',
+        try {
+          const processRes = await fetch(`/api/notebooks/${notebookId}/sources/${uploadData.sourceId}/process`, {
+            method: 'POST',
           })
-        } else {
-          toast({ title: 'File added successfully' })
+
+          if (processRes.ok) {
+            toast({ title: 'File added successfully' })
+          } else {
+            // 502/504 often means timeout but processing may still complete
+            console.log('Process request returned non-OK, but processing may have completed')
+            toast({ title: 'File added - processing in background' })
+          }
+        } catch (processError) {
+          // Network error or timeout - processing may still complete server-side
+          console.log('Process request failed, but processing may have completed:', processError)
+          toast({ title: 'File added - processing in background' })
         }
 
-        // Refresh again to get final status
+        // Refresh to get current status
         invalidateSources(notebookId)
       } else {
         toast({ title: 'File added successfully' })

@@ -1,14 +1,14 @@
 /**
  * Pipeline processing for ingested documents
  * Chunks text, generates embeddings, and stores in Supabase
+ *
+ * NOTE: Graph extraction is disabled here - too slow for serverless.
+ * Users can trigger graph building manually via "Build Graph" button.
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { chunkDocument, estimateTokens } from './chunking'
 import { batchGenerateEmbeddings } from './embeddings'
-import { extractFromText } from './extraction'
-import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { storeGraphExtraction } from '@/lib/graph/store'
 import type { SourceType } from '@/lib/types/database'
 
 interface ProcessSourceOptions {
@@ -33,7 +33,6 @@ export async function processSource(options: ProcessSourceOptions): Promise<{
   success: boolean
   sourceId: string
   chunkCount: number
-  graphExtracted?: boolean
   error?: string
 }> {
   const { sourceId, notebookId, userId, text, title, url, filename, sourceType } = options
@@ -83,9 +82,7 @@ export async function processSource(options: ProcessSourceOptions): Promise<{
       }
     }
 
-    // IMPORTANT: Update source status to success BEFORE graph extraction
-    // This ensures the source is marked complete even if graph extraction times out
-    // (common issue with serverless functions on Netlify)
+    // Update source status to success
     await supabase
       .from('sources')
       .update({
@@ -95,31 +92,15 @@ export async function processSource(options: ProcessSourceOptions): Promise<{
       })
       .eq('id', sourceId)
 
-    console.log(`[Pipeline] Source ${sourceId} marked as success with ${chunks.length} chunks`)
+    console.log(`[Pipeline] Source ${sourceId} complete: ${chunks.length} chunks`)
 
-    // Extract entities and skills for knowledge graph (if Neo4J is available)
-    // This is done AFTER marking success so serverless timeout doesn't leave source stuck
-    let graphExtracted = false
-    if (isNeo4JAvailable()) {
-      try {
-        console.log(`[Pipeline] Extracting entities for source ${sourceId}`)
-        const graphResult = await extractFromText(text, notebookId, sourceId)
-        await storeGraphExtraction(graphResult)
-        graphExtracted = true
-        console.log(`[Pipeline] Extracted ${graphResult.skills.length} skills, ${graphResult.entities.length} entities`)
-      } catch (graphError) {
-        // Log but don't fail the pipeline if graph extraction fails
-        console.error('[Pipeline] Graph extraction failed (continuing):', graphError)
-      }
-    } else {
-      console.log('[Pipeline] Neo4J not available, skipping graph extraction')
-    }
+    // Graph extraction is intentionally skipped - too slow for serverless
+    // Users can trigger graph building manually via "Build Graph" button
 
     return {
       success: true,
       sourceId,
       chunkCount: chunks.length,
-      graphExtracted,
     }
   } catch (error) {
     console.error('Pipeline processing error:', error)
