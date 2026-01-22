@@ -145,13 +145,13 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     };
   }, [notebookId, graphStatuses, fetchGraphStatus]);
 
-  // Extract graph for a single source
+  // Extract graph for a single source (streaming)
   const handleExtractGraph = async (sourceId: string) => {
     if (!notebookId) return;
 
     setGraphStatuses(prev => ({
       ...prev,
-      [sourceId]: { ...prev[sourceId], extracting: true, error: undefined }
+      [sourceId]: { ...prev[sourceId], extracting: true, error: undefined, jobStatus: 'pending' }
     }));
 
     try {
@@ -159,55 +159,83 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         method: "POST",
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
 
-      if (res.ok && data.async) {
-        // Async extraction started - update status with job info
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: true,
-            jobId: data.jobId,
-            jobStatus: 'pending',
+      // Handle streaming response
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            console.log(`[SourcesPanel] Stream event:`, event.status, event);
+
+            if (event.status === 'extracting') {
+              setGraphStatuses(prev => ({
+                ...prev,
+                [sourceId]: {
+                  ...prev[sourceId],
+                  extracting: true,
+                  jobId: event.jobId,
+                  jobStatus: 'processing',
+                }
+              }));
+            } else if (event.status === 'storing') {
+              setGraphStatuses(prev => ({
+                ...prev,
+                [sourceId]: {
+                  ...prev[sourceId],
+                  jobStatus: 'processing',
+                }
+              }));
+            } else if (event.status === 'complete') {
+              setGraphStatuses(prev => ({
+                ...prev,
+                [sourceId]: {
+                  graphed: true,
+                  skillCount: event.skillCount || 0,
+                  available: true,
+                  loading: false,
+                  extracting: false,
+                  jobId: event.jobId,
+                  jobStatus: 'completed',
+                }
+              }));
+              mutate(notebookKeys.graph(notebookId));
+              mutate(notebookKeys.learningPath(notebookId));
+              console.log(`[SourcesPanel] Extraction complete: ${event.skillCount} skills`);
+            } else if (event.status === 'error') {
+              setGraphStatuses(prev => ({
+                ...prev,
+                [sourceId]: {
+                  ...prev[sourceId],
+                  extracting: false,
+                  error: event.error || 'Extraction failed',
+                  jobStatus: 'failed',
+                }
+              }));
+              console.error(`[SourcesPanel] Extraction error:`, event.error);
+            }
+            // Ignore heartbeat events
+          } catch {
+            console.warn('[SourcesPanel] Failed to parse stream line:', line);
           }
-        }));
-        console.log(`[SourcesPanel] Async extraction started for source ${sourceId}, job ${data.jobId}`);
-      } else if (res.ok && !data.async) {
-        // Sync extraction completed (unlikely but handle it)
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            graphed: true,
-            skillCount: data.skillCount || 0,
-            available: true,
-            loading: false,
-            extracting: false,
-          }
-        }));
-        mutate(notebookKeys.graph(notebookId));
-        mutate(notebookKeys.learningPath(notebookId));
-      } else if (res.status === 409) {
-        // Extraction already in progress
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: true,
-            jobId: data.jobId,
-            jobStatus: data.status,
-          }
-        }));
-      } else {
-        // Error
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: false,
-            error: data.error || 'Extraction failed',
-          }
-        }));
+        }
       }
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
@@ -216,7 +244,7 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         [sourceId]: {
           ...prev[sourceId],
           extracting: false,
-          error: 'Network error - please try again',
+          error: err instanceof Error ? err.message : 'Network error - please try again',
         }
       }));
     }
