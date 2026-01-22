@@ -86,8 +86,9 @@ export async function POST(request: NextRequest) {
         title,
       });
 
-      // Process through pipeline (async - don't wait)
-      processSource({
+      // Process through pipeline - MUST await on serverless (Netlify kills context after response)
+      console.log(`[Upload] Starting pipeline processing for source ${sourceId}`);
+      const result = await processSource({
         sourceId,
         notebookId,
         userId: user.id,
@@ -95,7 +96,8 @@ export async function POST(request: NextRequest) {
         title,
         filename: file.name,
         sourceType: isPDF ? "pdf" : "txt",
-      }).catch(err => console.error("Pipeline processing failed:", err));
+      });
+      console.log(`[Upload] Pipeline completed for source ${sourceId}:`, result);
 
       return NextResponse.json({
         sourceId,
@@ -104,7 +106,10 @@ export async function POST(request: NextRequest) {
         content: text,
         filename: file.name,
         pages: totalPages,
-        processing: true,
+        processing: false,
+        success: result.success,
+        chunkCount: result.chunkCount,
+        graphExtracted: result.graphExtracted,
       });
     }
 

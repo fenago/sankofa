@@ -71,8 +71,11 @@ export async function POST(request: NextRequest) {
         title,
       });
 
-      // Process through pipeline (async - don't wait, UI will poll for status)
-      processSource({
+      // Process through pipeline - MUST await on serverless (Netlify kills context after response)
+      // The processSource function is already optimized to mark success before graph extraction
+      // so even if graph extraction times out, the source will be marked complete
+      console.log(`[Scrape] Starting pipeline processing for source ${sourceId}`);
+      const result = await processSource({
         sourceId,
         notebookId,
         userId: user.id,
@@ -80,7 +83,8 @@ export async function POST(request: NextRequest) {
         title,
         url,
         sourceType: "url",
-      }).catch(err => console.error("Pipeline processing failed:", err));
+      });
+      console.log(`[Scrape] Pipeline completed for source ${sourceId}:`, result);
 
       return NextResponse.json({
         sourceId,
@@ -88,7 +92,10 @@ export async function POST(request: NextRequest) {
         content,
         text,
         url,
-        processing: true,
+        processing: false,
+        success: result.success,
+        chunkCount: result.chunkCount,
+        graphExtracted: result.graphExtracted,
       });
     }
 
