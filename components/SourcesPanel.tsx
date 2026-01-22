@@ -17,6 +17,7 @@ interface GraphStatus {
   jobId?: string;
   jobStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
+  checkingAfterNetworkError?: boolean;
 }
 
 interface SourcesPanelProps {
@@ -57,6 +58,7 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
             jobId: data.jobId,
             jobStatus: data.jobStatus,
             error: data.lastJob?.status === 'failed' ? data.lastJob.error : undefined,
+            checkingAfterNetworkError: false,
           }
         }));
 
@@ -239,14 +241,48 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
       }
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
-      setGraphStatuses(prev => ({
-        ...prev,
-        [sourceId]: {
-          ...prev[sourceId],
-          extracting: false,
-          error: err instanceof Error ? err.message : 'Network error - please try again',
-        }
-      }));
+
+      // Check if this is a network error (connection lost, network changed, etc.)
+      const isNetworkError = err instanceof TypeError &&
+        (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch'));
+
+      if (isNetworkError && graphStatuses[sourceId]?.jobId) {
+        // Network error but job was started - poll to check actual status
+        console.log('[SourcesPanel] Network error during streaming, checking job status...');
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: true,
+            jobStatus: 'processing',
+            error: undefined,
+            checkingAfterNetworkError: true,
+          }
+        }));
+
+        // Wait a few seconds then check the actual status
+        setTimeout(async () => {
+          console.log('[SourcesPanel] Checking extraction status after network error...');
+          const data = await fetchGraphStatus(sourceId);
+          if (data) {
+            console.log('[SourcesPanel] Status check result:', data);
+            // If extraction completed, the status will be updated by fetchGraphStatus
+            // If still extracting, polling will continue
+            // If failed, error will be shown
+          }
+        }, 3000);
+      } else {
+        // Actual error or job never started
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: false,
+            error: err instanceof Error ? err.message : 'Network error - please try again',
+            jobStatus: 'failed',
+          }
+        }));
+      }
     }
   };
 
@@ -277,11 +313,12 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
   const getExtractionStatusText = (status: GraphStatus) => {
     if (status.loading) return "Checking...";
     if (status.extracting) {
+      if (status.checkingAfterNetworkError) return "Reconnecting...";
       if (status.jobStatus === 'pending') return "Starting...";
       if (status.jobStatus === 'processing') return "Extracting...";
       return "Extracting...";
     }
-    if (status.error) return "Failed";
+    if (status.error) return "Retry";
     if (!status.available) return "Unavailable";
     if (status.graphed) return "Re-extract";
     return "Extract to Graph";
@@ -415,7 +452,7 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                         ) : graphStatus.extracting ? (
                           <span className="text-blue-600 flex items-center gap-1 text-xs">
                             <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-                            {graphStatus.jobStatus === 'pending' ? 'Starting...' : 'Extracting...'}
+                            {graphStatus.checkingAfterNetworkError ? 'Reconnecting...' : graphStatus.jobStatus === 'pending' ? 'Starting...' : 'Extracting...'}
                           </span>
                         ) : graphStatus.error ? (
                           <span className="text-red-500 flex items-center gap-1 text-xs" title={graphStatus.error}>
