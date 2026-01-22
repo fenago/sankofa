@@ -11,8 +11,16 @@ import ReactFlow, {
   MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen } from "lucide-react";
+import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useGraph } from "@/hooks/useGraph";
 import { mutate } from "swr";
 import { notebookKeys } from "@/hooks/useNotebooks";
@@ -76,6 +84,8 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities">("graph");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -122,6 +132,30 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
       }, 5000);
     } finally {
       setIsExtracting(false);
+    }
+  }, [notebookId]);
+
+  const deleteGraph = useCallback(async () => {
+    setIsDeleting(true);
+    setExtractionError(null);
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/graph`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || data.message || "Delete failed");
+      }
+
+      // Revalidate graph data and learning path
+      mutate(notebookKeys.graph(notebookId));
+      mutate(notebookKeys.learningPath(notebookId));
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      setExtractionError(err instanceof Error ? err.message : "Failed to delete graph");
+    } finally {
+      setIsDeleting(false);
     }
   }, [notebookId]);
 
@@ -254,6 +288,18 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+          {skillCount > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="text-xs h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+              title="Delete Knowledge Graph"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -432,6 +478,42 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Knowledge Graph</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the entire knowledge graph for this notebook?
+              This will remove all {skillCount} skills and {entityCount} entities.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteGraph}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
