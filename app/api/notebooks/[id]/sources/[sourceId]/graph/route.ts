@@ -200,14 +200,16 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to start extraction' }, { status: 500 })
     }
 
-    // Trigger background function
-    const siteUrl = process.env.URL || process.env.NETLIFY_URL || 'http://localhost:8888'
-    const backgroundFunctionUrl = `${siteUrl}/.netlify/functions/extract-graph-background`
+    // Get the base URL for internal API call
+    const baseUrl = process.env.URL || process.env.NETLIFY_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
+    const workerUrl = `${baseUrl}/api/extract-worker`
+    const secret = process.env.INTERNAL_API_SECRET || 'dev-secret'
 
-    console.log(`[Graph] Triggering background function at ${backgroundFunctionUrl}`)
+    console.log(`[Graph] Triggering worker at ${workerUrl}`)
 
-    // Fire and forget - don't await
-    fetch(backgroundFunctionUrl, {
+    // Fire and forget - don't await the full response
+    // Just ensure the request is sent
+    fetch(workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -215,15 +217,21 @@ export async function POST(request: Request, { params }: RouteParams) {
         notebookId,
         sourceId,
         text,
+        secret,
       }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error('[Graph] Worker returned error:', res.status, errorText)
+      }
     }).catch(err => {
-      console.error('[Graph] Failed to trigger background function:', err)
+      console.error('[Graph] Failed to trigger worker:', err)
       // Update job as failed
       adminSupabase
         .from('extraction_jobs')
         .update({
           status: 'failed',
-          error_message: 'Failed to start background extraction',
+          error_message: 'Failed to start extraction worker: ' + (err instanceof Error ? err.message : 'Unknown'),
           completed_at: new Date().toISOString(),
         })
         .eq('id', job.id)
@@ -233,7 +241,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       success: true,
       async: true,
       jobId: job.id,
-      message: 'Extraction started in background. Poll GET endpoint for status.',
+      message: 'Extraction started. Poll GET endpoint for status.',
     })
   } catch (error) {
     console.error('Error starting source graph extraction:', error)

@@ -15,6 +15,10 @@
   # Maximum timeout for API routes (26s on Pro, 10s on Free)
   timeout = 26
 
+# Allow longer timeout for extraction worker (Pro plans)
+[functions."api/extract-worker"]
+  timeout = 300
+
 # Background function for long-running graph extraction (up to 15 minutes)
 [functions."extract-graph-background"]
   timeout = 900
