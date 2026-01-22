@@ -92,6 +92,18 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rebuild: true }),
       });
+
+      // Handle timeout - extraction may still complete server-side
+      if (res.status === 502 || res.status === 504) {
+        console.log("[Graph] Request timed out, but extraction may still complete");
+        // Poll for results after a delay
+        setTimeout(() => {
+          mutate(notebookKeys.graph(notebookId));
+          mutate(notebookKeys.learningPath(notebookId));
+        }, 5000);
+        return; // Don't show error, extraction is likely still running
+      }
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -102,7 +114,12 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
       mutate(notebookKeys.graph(notebookId));
       mutate(notebookKeys.learningPath(notebookId));
     } catch (err) {
-      setExtractionError(err instanceof Error ? err.message : "Unknown error");
+      // Network errors might mean timeout - check after delay
+      console.log("[Graph] Request failed, checking if extraction completed:", err);
+      setTimeout(() => {
+        mutate(notebookKeys.graph(notebookId));
+        mutate(notebookKeys.learningPath(notebookId));
+      }, 5000);
     } finally {
       setIsExtracting(false);
     }
