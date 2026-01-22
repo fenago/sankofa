@@ -18,6 +18,7 @@ interface GraphStatus {
   jobStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   checkingAfterNetworkError?: boolean;
+  extractionStartedAt?: number;
 }
 
 interface SourcesPanelProps {
@@ -38,6 +39,38 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
   const [activeTab, setActiveTab] = useState<"url" | "file">("url");
   const [graphStatuses, setGraphStatuses] = useState<Record<string, GraphStatus>>({});
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [, forceUpdate] = useState(0); // For elapsed time updates
+  const elapsedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update elapsed time display every second when extracting
+  useEffect(() => {
+    const hasExtractingSource = Object.values(graphStatuses).some(s => s.extracting);
+
+    if (hasExtractingSource && !elapsedTimerRef.current) {
+      elapsedTimerRef.current = setInterval(() => {
+        forceUpdate(n => n + 1);
+      }, 1000);
+    } else if (!hasExtractingSource && elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+    }
+
+    return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    };
+  }, [graphStatuses]);
+
+  // Format elapsed time
+  const formatElapsedTime = (startedAt: number) => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    if (elapsed < 60) return `${elapsed}s`;
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    return `${mins}m ${secs}s`;
+  };
 
   // Fetch graph status for a single source
   const fetchGraphStatus = useCallback(async (sourceId: string) => {
@@ -153,7 +186,7 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
 
     setGraphStatuses(prev => ({
       ...prev,
-      [sourceId]: { ...prev[sourceId], extracting: true, error: undefined, jobStatus: 'pending' }
+      [sourceId]: { ...prev[sourceId], extracting: true, error: undefined, jobStatus: 'pending', extractionStartedAt: Date.now() }
     }));
 
     try {
@@ -315,13 +348,24 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     if (status.extracting) {
       if (status.checkingAfterNetworkError) return "Reconnecting...";
       if (status.jobStatus === 'pending') return "Starting...";
-      if (status.jobStatus === 'processing') return "Extracting...";
-      return "Extracting...";
+      const elapsed = status.extractionStartedAt ? formatElapsedTime(status.extractionStartedAt) : '';
+      if (status.jobStatus === 'processing') return elapsed ? `Extracting (${elapsed})` : "Extracting...";
+      return elapsed ? `Extracting (${elapsed})` : "Extracting...";
     }
     if (status.error) return "Retry";
     if (!status.available) return "Unavailable";
     if (status.graphed) return "Re-extract";
     return "Extract to Graph";
+  };
+
+  // Get helpful message for long extractions
+  const getExtractionHelpText = (status: GraphStatus) => {
+    if (!status.extracting || !status.extractionStartedAt) return null;
+    const elapsed = Math.floor((Date.now() - status.extractionStartedAt) / 1000);
+    if (elapsed > 120) return "Large documents can take several minutes. The extraction continues in the background.";
+    if (elapsed > 60) return "Analyzing content and building knowledge graph...";
+    if (elapsed > 30) return "Extracting skills and relationships...";
+    return null;
   };
 
   return (
@@ -452,7 +496,11 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                         ) : graphStatus.extracting ? (
                           <span className="text-blue-600 flex items-center gap-1 text-xs">
                             <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
-                            {graphStatus.checkingAfterNetworkError ? 'Reconnecting...' : graphStatus.jobStatus === 'pending' ? 'Starting...' : 'Extracting...'}
+                            {graphStatus.checkingAfterNetworkError
+                              ? 'Reconnecting...'
+                              : graphStatus.jobStatus === 'pending'
+                                ? 'Starting...'
+                                : `Extracting${graphStatus.extractionStartedAt ? ` (${formatElapsedTime(graphStatus.extractionStartedAt)})` : '...'}`}
                           </span>
                         ) : graphStatus.error ? (
                           <span className="text-red-500 flex items-center gap-1 text-xs" title={graphStatus.error}>
@@ -474,6 +522,12 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                       </>
                     )}
                   </div>
+                  {/* Help text for long extractions */}
+                  {graphStatus && getExtractionHelpText(graphStatus) && (
+                    <p className="text-xs text-blue-600 mt-1 mb-2 italic">
+                      {getExtractionHelpText(graphStatus)}
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     {/* Extract to Graph button (only when notebookId is provided and source is ready) */}
                     {notebookId && source.status === "success" && (
