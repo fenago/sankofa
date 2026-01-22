@@ -19,6 +19,8 @@ interface GraphStatus {
   error?: string;
   checkingAfterNetworkError?: boolean;
   extractionStartedAt?: number;
+  lastPolledAt?: number;
+  pollCount?: number;
 }
 
 interface SourcesPanelProps {
@@ -156,8 +158,17 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
       if (!pollIntervalRef.current) {
         pollIntervalRef.current = setInterval(async () => {
           for (const sourceId of extractingSources) {
+            // Update poll tracking before fetch
+            setGraphStatuses(prev => ({
+              ...prev,
+              [sourceId]: {
+                ...prev[sourceId],
+                lastPolledAt: Date.now(),
+                pollCount: (prev[sourceId]?.pollCount || 0) + 1,
+              }
+            }));
+
             const data = await fetchGraphStatus(sourceId);
-            // If no longer extracting, we'll catch it in the next cycle
             if (data && !data.extracting) {
               console.log(`[SourcesPanel] Source ${sourceId} extraction completed`);
             }
@@ -297,14 +308,22 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     return "Extract to Graph";
   };
 
-  // Get helpful message for long extractions
+  // Get helpful message for extractions
   const getExtractionHelpText = (status: GraphStatus) => {
     if (!status.extracting || !status.extractionStartedAt) return null;
     const elapsed = Math.floor((Date.now() - status.extractionStartedAt) / 1000);
-    if (elapsed > 120) return "Large documents can take several minutes. The extraction continues in the background.";
-    if (elapsed > 60) return "Analyzing content and building knowledge graph...";
-    if (elapsed > 30) return "Extracting skills and relationships...";
-    return null;
+    if (elapsed > 180) return "Still working... Large documents can take 3-5 minutes. You can leave this page - extraction continues in background.";
+    if (elapsed > 120) return "Building knowledge graph... This typically takes 2-4 minutes for large documents.";
+    if (elapsed > 60) return "AI is analyzing content structure and relationships...";
+    if (elapsed > 30) return "Extracting skills, prerequisites, and educational metadata...";
+    if (elapsed > 10) return "Processing with AI... Status updates every 5 seconds.";
+    return "Starting extraction... This may take 1-4 minutes depending on document size.";
+  };
+
+  // Check if we just polled (within last 2 seconds)
+  const isRecentlyPolled = (status: GraphStatus) => {
+    if (!status.lastPolledAt) return false;
+    return Date.now() - status.lastPolledAt < 2000;
   };
 
   return (
@@ -439,7 +458,12 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                               ? 'Reconnecting...'
                               : graphStatus.jobStatus === 'pending'
                                 ? 'Starting...'
-                                : `Extracting${graphStatus.extractionStartedAt ? ` (${formatElapsedTime(graphStatus.extractionStartedAt)})` : '...'}`}
+                                : isRecentlyPolled(graphStatus)
+                                  ? 'Checking...'
+                                  : `Extracting${graphStatus.extractionStartedAt ? ` (${formatElapsedTime(graphStatus.extractionStartedAt)})` : '...'}`}
+                            {graphStatus.pollCount && graphStatus.pollCount > 0 && (
+                              <span className="text-blue-400 ml-1 text-[10px]">• {graphStatus.pollCount} checks</span>
+                            )}
                           </span>
                         ) : graphStatus.error ? (
                           <span className="text-red-500 flex items-center gap-1 text-xs" title={graphStatus.error}>
