@@ -26,7 +26,7 @@ export default function DashboardLayout({
               <span className="font-bold text-lg leading-tight">LearnGraph</span>
               <span className="text-[10px] text-gray-500 leading-tight">by DrLee.AI</span>
             </div>
-            <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-mono">v0.2.19</span>
+            <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-mono">v0.2.20</span>
           </Link>
 
           <div className="flex-1" />

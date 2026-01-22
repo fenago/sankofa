@@ -5,14 +5,9 @@
  * Triggered via: /.netlify/functions/extract-graph-background
  */
 
-import type { Context, Config } from '@netlify/functions'
+import type { Context } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenAI } from '@google/genai'
-
-// Export config for background execution
-export const config: Config = {
-  path: '/.netlify/functions/extract-graph-background',
-}
 
 interface ExtractRequest {
   jobId: string

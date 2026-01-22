@@ -1,6 +1,6 @@
 {
   "name": "learn-graph",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -51,6 +51,7 @@
     "vscode-languageserver-types": "^3.17.5"
   },
   "devDependencies": {
+    "@netlify/functions": "^5.1.2",
     "@netlify/plugin-nextjs": "^5.15.4",
     "@types/node": "^22",
     "@types/react": "^19",

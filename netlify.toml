@@ -8,6 +8,7 @@
 # Increase function timeout for heavy processing (scraping, embeddings)
 # Default is 10s, Pro plans allow up to 26s
 [functions]
+  directory = "netlify/functions"
   external_node_modules = ["unpdf", "neo4j-driver"]
   node_bundler = "esbuild"
 

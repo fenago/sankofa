@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
+import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
+import { extractFromText } from '@/lib/pipeline/extraction'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -109,12 +110,13 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// NOTE: Fire-and-forget extraction doesn't work on Netlify because the execution
-// context is killed when the function returns. Instead, the frontend must call
-// /api/extract-worker which has a 5-minute timeout.
-
-// POST /api/notebooks/[id]/sources/[sourceId]/graph - Start extraction (async)
+// POST /api/notebooks/[id]/sources/[sourceId]/graph - Run extraction synchronously
+// Note: Netlify has a 26s timeout. If extraction takes longer, it will timeout.
+// The job tracking allows the frontend to poll for completion.
 export async function POST(request: Request, { params }: RouteParams) {
+  const startTime = Date.now()
+  let jobId: string | undefined
+
   try {
     const { id: notebookId, sourceId } = await params
     const supabase = await createClient()
@@ -202,7 +204,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         notebook_id: notebookId,
         source_id: sourceId,
         user_id: user.id,
-        status: 'pending',
+        status: 'processing', // Start as processing since we're running now
       })
       .select('id')
       .single()
@@ -211,19 +213,61 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to create job record' }, { status: 500 })
     }
 
-    console.log(`[Graph] Created job ${job.id} for ${text.length} chars. Frontend must call /api/extract-worker to start.`)
+    jobId = job.id
+    console.log(`[Graph] Starting extraction job ${job.id} for ${text.length} chars`)
 
-    // Return job ID - frontend will call /api/extract-worker to start the actual extraction
-    // This pattern avoids Netlify's execution context kill issue
+    // Run extraction synchronously
+    const extractionResult = await extractFromText(text, notebookId, sourceId)
+
+    console.log(`[Graph] Extracted ${extractionResult.skills.length} skills, ${extractionResult.prerequisites.length} prerequisites in ${Date.now() - startTime}ms`)
+
+    // Store in Neo4J
+    await storeGraphExtraction(extractionResult)
+    console.log(`[Graph] Stored in Neo4J`)
+
+    // Update job as completed
+    await adminSupabase
+      .from('extraction_jobs')
+      .update({
+        status: 'completed',
+        skill_count: extractionResult.skills.length,
+        prerequisite_count: extractionResult.prerequisites.length,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', job.id)
+
+    console.log(`[Graph] Job ${job.id} completed in ${Date.now() - startTime}ms`)
+
     return NextResponse.json({
-      status: 'created',
+      status: 'completed',
       jobId: job.id,
-      textLength: text.length,
-      message: 'Job created. Call /api/extract-worker to start extraction.'
-    }, { status: 202 })
+      skillCount: extractionResult.skills.length,
+      prerequisiteCount: extractionResult.prerequisites.length,
+      durationMs: Date.now() - startTime
+    })
 
   } catch (error) {
     console.error('[Graph] POST error:', error)
+
+    // Try to mark job as failed
+    if (jobId) {
+      try {
+        const adminSupabase = createAdminClient()
+        await adminSupabase
+          .from('extraction_jobs')
+          .update({
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId)
+      } catch (updateError) {
+        console.error('[Graph] Failed to update job status:', updateError)
+      }
+    }
+
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Internal server error'
     }, { status: 500 })

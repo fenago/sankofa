@@ -217,8 +217,21 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         throw new Error('No job ID returned from server');
       }
 
+      // Extraction is now running synchronously in the graph route
+      // The request may take a while but we don't block the UI
       const jobId = createData.jobId;
-      console.log(`[SourcesPanel] Job created: ${jobId}, ${createData.textLength} chars. Starting worker...`);
+
+      // If we get a completed status, extraction finished within the request
+      if (createData.status === 'completed') {
+        console.log(`[SourcesPanel] Extraction completed immediately: ${createData.skillCount} skills in ${createData.durationMs}ms`);
+
+        // Refresh graph status
+        await fetchGraphStatus(sourceId);
+        return;
+      }
+
+      // Otherwise extraction is still running - polling will track it
+      console.log(`[SourcesPanel] Job ${jobId} started, ${createData.textLength || 'unknown'} chars. Polling for completion...`);
 
       // Update state with job ID
       setGraphStatuses(prev => ({
@@ -231,72 +244,34 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         }
       }));
 
-      // Step 2: Call the Netlify background function to run extraction
-      // This is a true background function with 15-minute timeout
-      // We don't await this - it returns 202 immediately and processes in background
-      fetch('/.netlify/functions/extract-graph-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          notebookId,
-          sourceId,
-          // Text will be fetched from Supabase by the background function
-        }),
-      }).then(async (workerRes) => {
-        const workerData = await workerRes.json();
-        console.log(`[SourcesPanel] Background function response:`, workerData);
-        if (!workerRes.ok) {
-          console.error(`[SourcesPanel] Background function error:`, workerData.error);
-          // If worker failed, polling will pick up the failed status
-        }
-      }).catch((workerErr) => {
-        // Worker errors will be tracked by job status polling
-        console.error(`[SourcesPanel] Background function call failed:`, workerErr);
-      });
-
       // Polling will automatically pick up this job and track completion
 
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
 
-      // Check if this is a network error
-      const isNetworkError = err instanceof TypeError &&
-        (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch'));
+      // For any error (network, timeout, etc.), check if job might still be processing
+      // The server might have timed out but the job could still be running
+      console.log('[SourcesPanel] Error occurred, checking job status...');
+      setGraphStatuses(prev => ({
+        ...prev,
+        [sourceId]: {
+          ...prev[sourceId],
+          extracting: true,
+          jobStatus: 'processing',
+          error: undefined,
+          checkingAfterNetworkError: true,
+        }
+      }));
 
-      if (isNetworkError) {
-        // Network error - check if job might have started anyway
-        console.log('[SourcesPanel] Network error, checking job status...');
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: true,
-            jobStatus: 'processing',
-            error: undefined,
-            checkingAfterNetworkError: true,
-          }
-        }));
-
-        // Check actual status after a delay
-        setTimeout(async () => {
-          const data = await fetchGraphStatus(sourceId);
-          if (data) {
-            console.log('[SourcesPanel] Status check result:', data);
-          }
-        }, 3000);
-      } else {
-        // Actual error
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: false,
-            error: err instanceof Error ? err.message : 'Request failed',
-            jobStatus: 'failed',
-          }
-        }));
-      }
+      // Check actual status after a delay - the job might have completed
+      setTimeout(async () => {
+        const data = await fetchGraphStatus(sourceId);
+        if (data) {
+          console.log('[SourcesPanel] Status check result:', data);
+          // If the job completed or failed, the status will be updated
+          // If still processing, polling will continue
+        }
+      }, 3000);
     }
   };
 
