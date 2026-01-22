@@ -103,7 +103,7 @@ export interface PrerequisiteRelationship {
   strength: 'required' | 'recommended' | 'helpful'
   confidenceScore: number // 0-1
   reasoning?: string
-  inferenceMethod?: 'llm_extracted' | 'semantic_similarity' | 'bloom_heuristic' | 'keyword_overlap'
+  inferenceMethod?: 'llm_extracted' | 'llm_inferred' | 'semantic_similarity' | 'bloom_heuristic' | 'keyword_overlap'
 }
 
 // Extracted from relationship (skill to content source)
