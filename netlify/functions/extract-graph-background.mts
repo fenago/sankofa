@@ -18,7 +18,7 @@ interface ExtractRequest {
   jobId: string
   notebookId: string
   sourceId: string
-  text: string
+  text?: string // Optional - will fetch from Supabase if not provided
 }
 
 interface RawSkill {
@@ -99,14 +99,30 @@ export default async function handler(request: Request, context: Context) {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  const body = await request.json() as ExtractRequest
-  const { jobId, notebookId, sourceId, text } = body
-
-  if (!jobId || !notebookId || !sourceId || !text) {
-    return new Response('Missing required fields', { status: 400 })
+  let body: ExtractRequest
+  try {
+    body = await request.json() as ExtractRequest
+  } catch (parseError) {
+    console.error('[BackgroundExtraction] Failed to parse request body:', parseError)
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 
+  const { jobId, notebookId, sourceId, text } = body
+
+  if (!jobId || !notebookId || !sourceId) {
+    return new Response(JSON.stringify({ error: 'Missing required fields: jobId, notebookId, sourceId' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  console.log(`[BackgroundExtraction] Job ${jobId}, notebook ${notebookId}, source ${sourceId}`)
+
   // Start background processing
+  // Text can be passed directly or will be fetched from Supabase
   context.waitUntil(processExtraction(jobId, notebookId, sourceId, text))
 
   // Return 202 Accepted immediately
@@ -124,7 +140,7 @@ async function processExtraction(
   jobId: string,
   notebookId: string,
   sourceId: string,
-  text: string
+  providedText?: string
 ) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
@@ -135,14 +151,48 @@ async function processExtraction(
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  console.log(`[BackgroundExtraction] Processing job ${jobId}, source ${sourceId}, ${text.length} chars`)
+  console.log(`[BackgroundExtraction] Processing job ${jobId}, source ${sourceId}`)
 
   try {
     // Update job status to processing
     await supabase
       .from('extraction_jobs')
-      .update({ status: 'processing' })
+      .update({ status: 'processing', updated_at: new Date().toISOString() })
       .eq('id', jobId)
+
+    // Get text - either provided or fetch from Supabase
+    let text = providedText
+    if (!text) {
+      console.log(`[BackgroundExtraction] Fetching text from Supabase for source ${sourceId}`)
+
+      // Try to get raw_text from source
+      const { data: source } = await supabase
+        .from('sources')
+        .select('raw_text')
+        .eq('id', sourceId)
+        .single()
+
+      text = source?.raw_text
+
+      // If no raw_text, reconstruct from chunks
+      if (!text) {
+        const { data: chunks } = await supabase
+          .from('chunks')
+          .select('content')
+          .eq('source_id', sourceId)
+          .order('chunk_index', { ascending: true })
+
+        if (chunks && chunks.length > 0) {
+          text = chunks.map(c => c.content).join('\n\n')
+        }
+      }
+
+      if (!text) {
+        throw new Error('No content available for source')
+      }
+    }
+
+    console.log(`[BackgroundExtraction] Processing ${text.length} chars`)
 
     // Run full extraction
     const extractionResult = await runExtraction(geminiKey, text, notebookId, sourceId)

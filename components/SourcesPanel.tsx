@@ -231,28 +231,28 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         }
       }));
 
-      // Step 2: Call the extract-worker endpoint to actually run extraction
-      // This endpoint has 5-minute timeout vs the normal 26s
-      // We don't await this - it will run and polling will track completion
-      fetch('/api/extract-worker', {
+      // Step 2: Call the Netlify background function to run extraction
+      // This is a true background function with 15-minute timeout
+      // We don't await this - it returns 202 immediately and processes in background
+      fetch('/.netlify/functions/extract-graph-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Important: include cookies for auth
         body: JSON.stringify({
           jobId,
           notebookId,
           sourceId,
+          // Text will be fetched from Supabase by the background function
         }),
       }).then(async (workerRes) => {
         const workerData = await workerRes.json();
-        console.log(`[SourcesPanel] Worker response:`, workerData);
+        console.log(`[SourcesPanel] Background function response:`, workerData);
         if (!workerRes.ok) {
-          console.error(`[SourcesPanel] Worker error:`, workerData.error);
+          console.error(`[SourcesPanel] Background function error:`, workerData.error);
           // If worker failed, polling will pick up the failed status
         }
       }).catch((workerErr) => {
         // Worker errors will be tracked by job status polling
-        console.error(`[SourcesPanel] Worker call failed:`, workerErr);
+        console.error(`[SourcesPanel] Background function call failed:`, workerErr);
       });
 
       // Polling will automatically pick up this job and track completion
