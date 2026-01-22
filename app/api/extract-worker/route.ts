@@ -1,12 +1,13 @@
 /**
- * Internal worker route for graph extraction
- * Called in fire-and-forget mode from the source graph API
+ * Worker route for graph extraction with extended timeout
+ * Can be called by authenticated users (for their own sources) or internally
  *
  * This route handles the actual extraction work and updates job status
+ * Has 5-minute timeout vs the normal 26s for API routes
  */
 
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { extractFromText } from '@/lib/pipeline/extraction'
 import { storeGraphExtraction } from '@/lib/graph/store'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
@@ -18,8 +19,8 @@ interface ExtractRequest {
   jobId: string
   notebookId: string
   sourceId: string
-  text: string
-  secret: string
+  text?: string // Optional - will be fetched if not provided
+  secret?: string
 }
 
 export async function POST(request: Request) {
@@ -27,18 +28,66 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as ExtractRequest
-    const { jobId, notebookId, sourceId, text, secret } = body
+    const { jobId, notebookId, sourceId, secret } = body
+    let { text } = body
 
-    // Verify internal call
-    if (secret !== process.env.INTERNAL_API_SECRET && secret !== 'dev-secret') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const adminSupabase = createAdminClient()
+
+    // Auth: either internal secret OR authenticated user who owns the notebook
+    const isInternalCall = secret === process.env.INTERNAL_API_SECRET || secret === 'dev-secret'
+
+    if (!isInternalCall) {
+      // Verify user auth
+      const supabase = await createClient()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Verify notebook ownership
+      const { data: notebook } = await supabase
+        .from('notebooks')
+        .select('id')
+        .eq('id', notebookId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!notebook) {
+        return NextResponse.json({ error: 'Notebook not found' }, { status: 404 })
+      }
     }
 
-    if (!jobId || !notebookId || !sourceId || !text) {
+    if (!jobId || !notebookId || !sourceId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const adminSupabase = createAdminClient()
+    // If text not provided, fetch it from the source
+    if (!text) {
+      const { data: source } = await adminSupabase
+        .from('sources')
+        .select('raw_text')
+        .eq('id', sourceId)
+        .single()
+
+      if (source?.raw_text) {
+        text = source.raw_text
+      } else {
+        // Try to reconstruct from chunks
+        const { data: chunks } = await adminSupabase
+          .from('chunks')
+          .select('content')
+          .eq('source_id', sourceId)
+          .order('chunk_index', { ascending: true })
+
+        if (chunks && chunks.length > 0) {
+          text = chunks.map(c => c.content).join('\n\n')
+        }
+      }
+
+      if (!text) {
+        return NextResponse.json({ error: 'No content available for source' }, { status: 400 })
+      }
+    }
 
     console.log(`[ExtractWorker] Starting job ${jobId}, source ${sourceId}, ${text.length} chars`)
 

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
-import { extractFromText } from '@/lib/pipeline/extraction'
+import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -110,60 +109,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// Async extraction runner - fire and forget
-async function runExtractionAsync(
-  jobId: string,
-  notebookId: string,
-  sourceId: string,
-  text: string
-) {
-  const adminSupabase = createAdminClient()
-
-  try {
-    console.log(`[Graph] Starting async extraction for job ${jobId}: ${text.length} chars`)
-
-    // Update job to processing
-    await adminSupabase
-      .from('extraction_jobs')
-      .update({ status: 'processing', updated_at: new Date().toISOString() })
-      .eq('id', jobId)
-
-    // Run extraction
-    const extractionResult = await extractFromText(text, notebookId, sourceId)
-
-    console.log(`[Graph] Extracted ${extractionResult.skills.length} skills, storing in Neo4J`)
-
-    // Store in Neo4J
-    await storeGraphExtraction(extractionResult)
-
-    // Update job as completed
-    await adminSupabase
-      .from('extraction_jobs')
-      .update({
-        status: 'completed',
-        skill_count: extractionResult.skills.length,
-        prerequisite_count: extractionResult.prerequisites.length,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', jobId)
-
-    console.log(`[Graph] Extraction complete for job ${jobId}: ${extractionResult.skills.length} skills`)
-
-  } catch (error) {
-    console.error(`[Graph] Extraction failed for job ${jobId}:`, error)
-
-    await adminSupabase
-      .from('extraction_jobs')
-      .update({
-        status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', jobId)
-  }
-}
+// NOTE: Fire-and-forget extraction doesn't work on Netlify because the execution
+// context is killed when the function returns. Instead, the frontend must call
+// /api/extract-worker which has a 5-minute timeout.
 
 // POST /api/notebooks/[id]/sources/[sourceId]/graph - Start extraction (async)
 export async function POST(request: Request, { params }: RouteParams) {
@@ -263,19 +211,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to create job record' }, { status: 500 })
     }
 
-    console.log(`[Graph] Created job ${job.id}, starting async extraction for ${text.length} chars`)
+    console.log(`[Graph] Created job ${job.id} for ${text.length} chars. Frontend must call /api/extract-worker to start.`)
 
-    // Fire and forget - start extraction but don't wait
-    // This works on Netlify because the function continues after response
-    runExtractionAsync(job.id, notebookId, sourceId, text).catch(err => {
-      console.error('[Graph] Async extraction error:', err)
-    })
-
-    // Return immediately with job ID - frontend will poll for status
+    // Return job ID - frontend will call /api/extract-worker to start the actual extraction
+    // This pattern avoids Netlify's execution context kill issue
     return NextResponse.json({
-      status: 'started',
+      status: 'created',
       jobId: job.id,
-      message: 'Extraction started. Poll GET endpoint for status.'
+      textLength: text.length,
+      message: 'Job created. Call /api/extract-worker to start extraction.'
     }, { status: 202 })
 
   } catch (error) {

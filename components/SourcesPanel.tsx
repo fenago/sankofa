@@ -201,30 +201,60 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     }));
 
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`, {
+      // Step 1: Create the extraction job
+      console.log(`[SourcesPanel] Creating extraction job for source ${sourceId}`);
+      const createRes = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`, {
         method: "POST",
       });
 
-      const data = await res.json();
+      const createData = await createRes.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!createRes.ok) {
+        throw new Error(createData.error || `HTTP ${createRes.status}`);
       }
 
-      // Job started successfully
-      if (data.status === 'started' && data.jobId) {
-        console.log(`[SourcesPanel] Extraction started, job ${data.jobId}`);
-        setGraphStatuses(prev => ({
-          ...prev,
-          [sourceId]: {
-            ...prev[sourceId],
-            extracting: true,
-            jobId: data.jobId,
-            jobStatus: 'processing',
-          }
-        }));
-        // Polling will automatically pick up this job and track completion
+      if (!createData.jobId) {
+        throw new Error('No job ID returned from server');
       }
+
+      const jobId = createData.jobId;
+      console.log(`[SourcesPanel] Job created: ${jobId}, ${createData.textLength} chars. Starting worker...`);
+
+      // Update state with job ID
+      setGraphStatuses(prev => ({
+        ...prev,
+        [sourceId]: {
+          ...prev[sourceId],
+          extracting: true,
+          jobId: jobId,
+          jobStatus: 'processing',
+        }
+      }));
+
+      // Step 2: Call the extract-worker endpoint to actually run extraction
+      // This endpoint has 5-minute timeout vs the normal 26s
+      // We don't await this - it will run and polling will track completion
+      fetch('/api/extract-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          notebookId,
+          sourceId,
+          // Don't pass text - worker will fetch it to avoid large payloads
+        }),
+      }).then(async (workerRes) => {
+        const workerData = await workerRes.json();
+        console.log(`[SourcesPanel] Worker response:`, workerData);
+        if (!workerRes.ok) {
+          console.error(`[SourcesPanel] Worker error:`, workerData.error);
+        }
+      }).catch((workerErr) => {
+        // Worker errors will be tracked by job status polling
+        console.error(`[SourcesPanel] Worker call failed:`, workerErr);
+      });
+
+      // Polling will automatically pick up this job and track completion
 
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
