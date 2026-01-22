@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
-import { extractFromText } from '@/lib/pipeline/extraction'
+import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -110,11 +109,11 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// POST /api/notebooks/[id]/sources/[sourceId]/graph - Extract graph with streaming
+// POST /api/notebooks/[id]/sources/[sourceId]/graph - Extract graph via background function
 export async function POST(request: Request, { params }: RouteParams) {
   const encoder = new TextEncoder()
 
-  // Create a streaming response to avoid Netlify timeout
+  // Create a streaming response for status updates
   const stream = new TransformStream()
   const writer = stream.writable.getWriter()
 
@@ -124,10 +123,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     await writer.write(encoder.encode(message))
   }
 
-  // Start the async extraction process
-  const extractionPromise = (async () => {
-    let jobId: string | null = null
-
+  // Process the request
+  const processRequest = async () => {
     try {
       const { id: notebookId, sourceId } = await params
       const supabase = await createClient()
@@ -220,14 +217,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       // Delete existing skills for this source
       await deleteSourceSkills(sourceId)
 
-      // Create job record
+      // Create job record with 'pending' status
       const { data: job, error: jobError } = await adminSupabase
         .from('extraction_jobs')
         .insert({
           notebook_id: notebookId,
           source_id: sourceId,
           user_id: user.id,
-          status: 'processing',
+          status: 'pending',
         })
         .select('id')
         .single()
@@ -237,88 +234,90 @@ export async function POST(request: Request, { params }: RouteParams) {
         return
       }
 
-      jobId = job.id
+      const jobId = job.id
       await sendStatus('extracting', { jobId, textLength: text.length })
 
-      console.log(`[Graph] Starting extraction for source ${sourceId}: ${text.length} chars`)
+      console.log(`[Graph] Invoking background function for source ${sourceId}: ${text.length} chars`)
 
-      // Send heartbeats every 5 seconds to keep connection alive
-      const heartbeatInterval = setInterval(async () => {
-        try {
-          await sendStatus('heartbeat', { jobId })
-        } catch {
-          // Connection closed
-        }
-      }, 5000)
+      // Invoke the Netlify background function
+      const baseUrl = process.env.NETLIFY_URL || process.env.URL || 'http://localhost:3001'
+      const bgFunctionUrl = `${baseUrl}/.netlify/functions/extract-graph-background`
 
       try {
-        // Run extraction
-        const extractionResult = await extractFromText(text, notebookId, sourceId)
-
-        clearInterval(heartbeatInterval)
-
-        await sendStatus('storing', {
-          jobId,
-          skillCount: extractionResult.skills.length,
-          prerequisiteCount: extractionResult.prerequisites.length
+        const bgResponse = await fetch(bgFunctionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            notebookId,
+            sourceId,
+            text,
+          }),
         })
 
-        console.log(`[Graph] Extracted ${extractionResult.skills.length} skills, storing in Neo4J`)
+        if (!bgResponse.ok) {
+          const errorText = await bgResponse.text()
+          console.error(`[Graph] Background function error: ${bgResponse.status} ${errorText}`)
 
-        // Store in Neo4J
-        await storeGraphExtraction(extractionResult)
+          // Mark job as failed
+          await adminSupabase
+            .from('extraction_jobs')
+            .update({
+              status: 'failed',
+              error_message: `Background function failed: ${bgResponse.status}`,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', jobId)
 
-        // Update job as completed
+          await sendStatus('error', { error: 'Failed to start background extraction', jobId })
+          return
+        }
+
+        console.log(`[Graph] Background function invoked successfully for job ${jobId}`)
+
+        // Update job to processing since background function accepted it
         await adminSupabase
           .from('extraction_jobs')
-          .update({
-            status: 'completed',
-            skill_count: extractionResult.skills.length,
-            prerequisite_count: extractionResult.prerequisites.length,
-            completed_at: new Date().toISOString()
-          })
+          .update({ status: 'processing' })
           .eq('id', jobId)
 
-        await sendStatus('complete', {
+        // Send started status - frontend will poll for completion
+        await sendStatus('started', {
           jobId,
-          skillCount: extractionResult.skills.length,
-          prerequisiteCount: extractionResult.prerequisites.length
+          message: 'Extraction started in background. Poll for status updates.'
         })
 
-        console.log(`[Graph] Extraction complete: ${extractionResult.skills.length} skills`)
+      } catch (fetchError) {
+        console.error('[Graph] Failed to invoke background function:', fetchError)
 
-      } catch (extractError) {
-        clearInterval(heartbeatInterval)
-        throw extractError
-      }
-
-    } catch (error) {
-      console.error('[Graph] Extraction error:', error)
-
-      // Update job as failed if we have a jobId
-      if (jobId) {
-        const adminSupabase = createAdminClient()
+        // Mark job as failed
         await adminSupabase
           .from('extraction_jobs')
           .update({
             status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_message: fetchError instanceof Error ? fetchError.message : 'Failed to invoke background function',
             completed_at: new Date().toISOString()
           })
           .eq('id', jobId)
+
+        await sendStatus('error', {
+          error: 'Failed to start background extraction',
+          jobId
+        })
       }
 
+    } catch (error) {
+      console.error('[Graph] Request processing error:', error)
       await sendStatus('error', {
-        error: error instanceof Error ? error.message : 'Extraction failed',
-        jobId
+        error: error instanceof Error ? error.message : 'Request processing failed'
       })
     } finally {
       await writer.close()
     }
-  })()
+  }
 
-  // Don't await - let it run in background while streaming
-  extractionPromise.catch(console.error)
+  // Process request (fast - just starts the background job)
+  processRequest().catch(console.error)
 
   return new Response(stream.readable, {
     headers: {

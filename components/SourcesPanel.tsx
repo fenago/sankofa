@@ -242,6 +242,21 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                   jobStatus: 'processing',
                 }
               }));
+            } else if (event.status === 'started') {
+              // Background function accepted the job - keep polling
+              localJobId = event.jobId;
+              setGraphStatuses(prev => ({
+                ...prev,
+                [sourceId]: {
+                  ...prev[sourceId],
+                  extracting: true,
+                  jobId: event.jobId,
+                  jobStatus: 'processing',
+                }
+              }));
+              console.log(`[SourcesPanel] Background extraction started, job ${event.jobId}`);
+              // Trigger immediate status check then polling will take over
+              setTimeout(() => fetchGraphStatus(sourceId), 2000);
             } else if (event.status === 'complete') {
               setGraphStatuses(prev => ({
                 ...prev,
