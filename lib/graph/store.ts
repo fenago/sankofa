@@ -394,6 +394,33 @@ export async function deleteSourceGraph(sourceDocumentId: string): Promise<void>
   console.log(`[Neo4J] Deleted all graph data for source: ${sourceDocumentId}`)
 }
 
+// Alias for API consistency
+export const deleteSourceSkills = deleteSourceGraph
+
+/**
+ * Get skill count for a specific source document
+ */
+export async function getSkillCountBySource(sourceDocumentId: string): Promise<number> {
+  const result = await runQuery<{ count: number }>(
+    `
+    MATCH (s:Skill {sourceDocumentId: $sourceDocumentId})
+    RETURN count(s) as count
+    `,
+    { sourceDocumentId }
+  )
+
+  if (result.length === 0) {
+    return 0
+  }
+
+  const count = result[0].count
+  // Handle Neo4J Integer type
+  if (typeof count === 'object' && count !== null && 'toNumber' in count) {
+    return (count as { toNumber: () => number }).toNumber()
+  }
+  return Number(count) || 0
+}
+
 /**
  * Delete all graph data for multiple notebooks (user cleanup)
  */

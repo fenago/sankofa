@@ -595,6 +595,7 @@ export default function NotebookPage({ params }: NotebookPageProps) {
           } lg:block lg:col-span-3 border-r border-gray-200 h-full overflow-hidden min-w-0`}
         >
           <SourcesPanel
+            notebookId={notebookId}
             sources={sources}
             onAddUrl={handleAddUrl}
             onAddFile={handleAddFile}

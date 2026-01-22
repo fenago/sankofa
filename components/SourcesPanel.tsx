@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { Link, FileUp, Plus, X, Loader2, CheckCircle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Link, FileUp, Plus, X, Loader2, CheckCircle, Network, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Source } from "@/lib/types";
+import { mutate } from "swr";
+import { notebookKeys } from "@/hooks/useNotebooks";
+
+interface GraphStatus {
+  graphed: boolean;
+  skillCount: number;
+  available: boolean;
+  loading?: boolean;
+  extracting?: boolean;
+}
 
 interface SourcesPanelProps {
+  notebookId?: string; // Optional - graph features only available when provided
   sources: Source[];
   onAddUrl: (url: string) => Promise<void>;
   onAddFile: (file: File) => Promise<void>;
@@ -15,9 +26,144 @@ interface SourcesPanelProps {
   isLoading: boolean;
 }
 
-export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onAnalyze, isLoading }: SourcesPanelProps) {
+export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemoveSource, onAnalyze, isLoading }: SourcesPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const [activeTab, setActiveTab] = useState<"url" | "file">("url");
+  const [graphStatuses, setGraphStatuses] = useState<Record<string, GraphStatus>>({});
+
+  // Fetch graph status for all ready sources (only when notebookId is provided)
+  const fetchGraphStatuses = useCallback(async () => {
+    if (!notebookId) return;
+
+    const readySources = sources.filter(s => s.status === "success");
+
+    for (const source of readySources) {
+      // Skip if already loading or extracting
+      if (graphStatuses[source.id]?.loading || graphStatuses[source.id]?.extracting) continue;
+
+      try {
+        setGraphStatuses(prev => ({
+          ...prev,
+          [source.id]: { ...prev[source.id], loading: true }
+        }));
+
+        const res = await fetch(`/api/notebooks/${notebookId}/sources/${source.id}/graph`);
+        if (res.ok) {
+          const data = await res.json();
+          setGraphStatuses(prev => ({
+            ...prev,
+            [source.id]: {
+              graphed: data.graphed,
+              skillCount: data.skillCount,
+              available: data.available,
+              loading: false,
+              extracting: prev[source.id]?.extracting || false,
+            }
+          }));
+        }
+      } catch {
+        setGraphStatuses(prev => ({
+          ...prev,
+          [source.id]: { graphed: false, skillCount: 0, available: false, loading: false }
+        }));
+      }
+    }
+  }, [sources, notebookId, graphStatuses]);
+
+  // Fetch graph statuses on mount and when sources change
+  useEffect(() => {
+    if (!notebookId) return;
+
+    const readySources = sources.filter(s => s.status === "success");
+    // Only fetch for sources we haven't checked yet
+    const uncheckedSources = readySources.filter(s => !graphStatuses[s.id]);
+    if (uncheckedSources.length > 0) {
+      fetchGraphStatuses();
+    }
+  }, [sources, fetchGraphStatuses, graphStatuses, notebookId]);
+
+  // Extract graph for a single source
+  const handleExtractGraph = async (sourceId: string) => {
+    if (!notebookId) return;
+
+    setGraphStatuses(prev => ({
+      ...prev,
+      [sourceId]: { ...prev[sourceId], extracting: true }
+    }));
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`, {
+        method: "POST",
+      });
+
+      // Handle timeout gracefully
+      if (res.status === 502 || res.status === 504) {
+        // Poll after a delay
+        setTimeout(async () => {
+          const checkRes = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
+          if (checkRes.ok) {
+            const data = await checkRes.json();
+            setGraphStatuses(prev => ({
+              ...prev,
+              [sourceId]: {
+                graphed: data.graphed,
+                skillCount: data.skillCount,
+                available: data.available,
+                loading: false,
+                extracting: false,
+              }
+            }));
+            // Revalidate the notebook graph
+            mutate(notebookKeys.graph(notebookId));
+            mutate(notebookKeys.learningPath(notebookId));
+          }
+        }, 5000);
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            graphed: true,
+            skillCount: data.skillCount || 0,
+            available: true,
+            loading: false,
+            extracting: false,
+          }
+        }));
+        // Revalidate the notebook graph
+        mutate(notebookKeys.graph(notebookId));
+        mutate(notebookKeys.learningPath(notebookId));
+      }
+    } catch {
+      // Network error - poll after delay
+      setTimeout(async () => {
+        const checkRes = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
+        if (checkRes.ok) {
+          const data = await checkRes.json();
+          setGraphStatuses(prev => ({
+            ...prev,
+            [sourceId]: {
+              graphed: data.graphed,
+              skillCount: data.skillCount,
+              available: data.available,
+              loading: false,
+              extracting: false,
+            }
+          }));
+          mutate(notebookKeys.graph(notebookId));
+          mutate(notebookKeys.learningPath(notebookId));
+        }
+      }, 5000);
+    } finally {
+      setGraphStatuses(prev => ({
+        ...prev,
+        [sourceId]: { ...prev[sourceId], extracting: false }
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,9 +182,9 @@ export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onA
   };
 
   // Count file sources (PDFs and TXTs)
-  const fileCount = sources.filter(s => 
-    s.url.toLowerCase().endsWith('.pdf') || 
-    s.url.toLowerCase().endsWith('.txt') || 
+  const fileCount = sources.filter(s =>
+    s.url.toLowerCase().endsWith('.pdf') ||
+    s.url.toLowerCase().endsWith('.txt') ||
     s.url.startsWith('file-')
   ).length;
 
@@ -137,33 +283,84 @@ export function SourcesPanel({ sources, onAddUrl, onAddFile, onRemoveSource, onA
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="space-y-3 pr-1">
-            {sources.map((source) => (
-              <div key={source.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <h4 className="text-sm font-medium text-black mb-1 truncate max-w-full block" title={source.title || source.url}>
-                    {source.title || source.url}
-                </h4>
-                <p className="text-xs text-gray-500 truncate max-w-full block mb-2" title={source.url}>{source.url}</p>
-                {source.status === "success" ? (
-                    <span className="text-green-600 flex items-center gap-1 text-xs mb-2">
-                        <CheckCircle className="h-3 w-3 flex-shrink-0" /> Ready
-                    </span>
-                ) : source.status === "error" ? (
-                    <span className="text-red-600 flex items-center gap-1 text-xs mb-2">
-                        <X className="h-3 w-3 flex-shrink-0" /> Error
-                    </span>
-                ) : (
-                    <span className="text-yellow-600 flex items-center gap-1 text-xs mb-2">
-                        <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" /> Processing
-                    </span>
-                )}
-                <button
-                  onClick={() => onRemoveSource(source.id)}
-                  className="w-full mt-1 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
-                >
-                  Delete Source
-                </button>
-              </div>
-            ))}
+            {sources.map((source) => {
+              const graphStatus = graphStatuses[source.id];
+              return (
+                <div key={source.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <h4 className="text-sm font-medium text-black mb-1 truncate max-w-full block" title={source.title || source.url}>
+                      {source.title || source.url}
+                  </h4>
+                  <p className="text-xs text-gray-500 truncate max-w-full block mb-2" title={source.url}>{source.url}</p>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {source.status === "success" ? (
+                        <span className="text-green-600 flex items-center gap-1 text-xs">
+                            <CheckCircle className="h-3 w-3 flex-shrink-0" /> Ready
+                        </span>
+                    ) : source.status === "error" ? (
+                        <span className="text-red-600 flex items-center gap-1 text-xs">
+                            <X className="h-3 w-3 flex-shrink-0" /> Error
+                        </span>
+                    ) : (
+                        <span className="text-yellow-600 flex items-center gap-1 text-xs">
+                            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" /> Processing
+                        </span>
+                    )}
+                    {/* Graph status indicator (only when notebookId is provided) */}
+                    {notebookId && source.status === "success" && graphStatus && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        {graphStatus.loading ? (
+                          <span className="text-gray-400 flex items-center gap-1 text-xs">
+                            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                          </span>
+                        ) : graphStatus.graphed ? (
+                          <span className="text-purple-600 flex items-center gap-1 text-xs">
+                            <Network className="h-3 w-3 flex-shrink-0" /> {graphStatus.skillCount} skills
+                          </span>
+                        ) : graphStatus.available ? (
+                          <span className="text-gray-400 flex items-center gap-1 text-xs">
+                            <Network className="h-3 w-3 flex-shrink-0" /> Not graphed
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Extract to Graph button (only when notebookId is provided) */}
+                    {notebookId && source.status === "success" && graphStatus?.available && (
+                      <button
+                        onClick={() => handleExtractGraph(source.id)}
+                        disabled={graphStatus.extracting}
+                        className={`flex-1 py-1.5 text-xs rounded border transition-colors flex items-center justify-center gap-1 ${
+                          graphStatus.extracting
+                            ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"
+                            : graphStatus.graphed
+                              ? "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200"
+                              : "text-black bg-white hover:bg-gray-100 border-gray-300"
+                        }`}
+                      >
+                        {graphStatus.extracting ? (
+                          <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                        ) : (
+                          <Sparkles className="h-3 w-3 flex-shrink-0" />
+                        )}
+                        {graphStatus.extracting
+                          ? "Extracting..."
+                          : graphStatus.graphed
+                            ? "Re-extract"
+                            : "Extract to Graph"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onRemoveSource(source.id)}
+                      className="flex-1 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
 
             {sources.length === 0 && (
                 <div className="text-center text-gray-400 py-8 text-sm">
