@@ -292,6 +292,7 @@ GUIDELINES:
 
 /**
  * Process large text in chunks for better extraction
+ * Uses PARALLEL processing to complete within serverless timeouts
  */
 async function extractFromTextChunked(
   text: string,
@@ -316,8 +317,27 @@ async function extractFromTextChunked(
     chunks.push(currentChunk.trim())
   }
 
-  console.log(`[Extraction] Split into ${chunks.length} chunks for processing`)
+  console.log(`[Extraction] Split into ${chunks.length} chunks, processing in PARALLEL`)
 
+  // Process ALL chunks in parallel for speed
+  const startTime = Date.now()
+  const chunkPromises = chunks.map((chunk, i) => {
+    console.log(`[Extraction] Starting chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`)
+    return extractFromTextDirect(
+      chunk,
+      notebookId,
+      sourceDocumentId,
+      existingSkillNames // Pass original existing skills to all chunks
+    ).catch(error => {
+      console.error(`[Extraction] Chunk ${i + 1} failed:`, error)
+      return null // Return null for failed chunks, continue with others
+    })
+  })
+
+  const chunkResults = await Promise.all(chunkPromises)
+  console.log(`[Extraction] All ${chunks.length} chunks completed in ${Date.now() - startTime}ms`)
+
+  // Merge results
   const allResults: GraphExtractionResult = {
     skills: [],
     prerequisites: [],
@@ -326,44 +346,26 @@ async function extractFromTextChunked(
     existingSkillReferences: [],
   }
 
-  // Track skill names across chunks for cross-chunk relationships
-  const accumulatedSkillNames: string[] = [...(existingSkillNames || [])]
+  for (const chunkResult of chunkResults) {
+    if (!chunkResult) continue // Skip failed chunks
 
-  for (let i = 0; i < chunks.length; i++) {
-    console.log(`[Extraction] Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`)
-    try {
-      // Call the non-chunked version for each chunk
-      const chunkResult = await extractFromTextDirect(
-        chunks[i],
-        notebookId,
-        sourceDocumentId,
-        accumulatedSkillNames
-      )
-
-      allResults.skills.push(...chunkResult.skills)
-      allResults.prerequisites.push(...chunkResult.prerequisites)
-      allResults.entities.push(...chunkResult.entities)
-      allResults.entityRelationships.push(...chunkResult.entityRelationships)
-      if (chunkResult.existingSkillReferences) {
-        allResults.existingSkillReferences?.push(...chunkResult.existingSkillReferences)
-      }
-
-      // Add skill names for next chunk to reference
-      accumulatedSkillNames.push(...chunkResult.skills.map(s => s.name))
-
-      // Small delay between chunks
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300))
-      }
-    } catch (error) {
-      console.error(`[Extraction] Chunk ${i + 1} failed:`, error)
-      // Continue with other chunks
+    allResults.skills.push(...chunkResult.skills)
+    allResults.prerequisites.push(...chunkResult.prerequisites)
+    allResults.entities.push(...chunkResult.entities)
+    allResults.entityRelationships.push(...chunkResult.entityRelationships)
+    if (chunkResult.existingSkillReferences) {
+      allResults.existingSkillReferences?.push(...chunkResult.existingSkillReferences)
     }
   }
 
   // Deduplicate
   allResults.skills = deduplicateSkills(allResults.skills)
   allResults.entities = deduplicateEntities(allResults.entities)
+  allResults.prerequisites = deduplicatePrerequisites(allResults.prerequisites)
+
+  // Infer cross-chunk prerequisites based on Bloom levels
+  const crossChunkPrereqs = inferCrossChunkPrerequisites(allResults.skills)
+  allResults.prerequisites.push(...crossChunkPrereqs)
   allResults.prerequisites = deduplicatePrerequisites(allResults.prerequisites)
 
   console.log(`[Extraction] Final: ${allResults.skills.length} skills, ${allResults.prerequisites.length} prerequisites`)
