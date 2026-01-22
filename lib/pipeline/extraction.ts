@@ -13,7 +13,8 @@ import type {
   BloomLevel,
 } from '@/lib/types/graph'
 
-const EXTRACTION_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+// Use Gemini 3 Flash for extraction (1M+ token context window)
+const EXTRACTION_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 
 let client: GoogleGenAI | null = null
 
@@ -28,9 +29,11 @@ function getClient(): GoogleGenAI {
   return client
 }
 
-// Maximum characters per extraction chunk
-// Using smaller chunks = better extraction quality
-const MAX_EXTRACTION_CHUNK_SIZE = 15000
+// Maximum characters before chunking kicks in
+// Gemini 3 Flash has 1M+ token context, so we can handle large documents in one shot
+// 150K chars ≈ 37K tokens, well within limits
+// Only chunk for very large documents (textbooks, etc.)
+const MAX_EXTRACTION_CHUNK_SIZE = 150000
 
 /**
  * Extract skills and entities from a text chunk

@@ -170,7 +170,7 @@ async function runExtraction(
   sourceDocumentId: string
 ) {
   const ai = new GoogleGenAI({ apiKey })
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 
   // Use the full detailed prompt for quality extraction
   const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that accurately represents the learning structure.
