@@ -180,12 +180,9 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     };
   }, [notebookId, graphStatuses, fetchGraphStatus]);
 
-  // Extract graph for a single source (streaming)
+  // Extract graph for a single source
   const handleExtractGraph = async (sourceId: string) => {
     if (!notebookId) return;
-
-    // Track jobId locally so we have it even if state update hasn't completed
-    let localJobId: string | null = null;
 
     setGraphStatuses(prev => ({
       ...prev,
@@ -197,122 +194,37 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         method: "POST",
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || `HTTP ${res.status}`);
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
 
-      // Handle streaming response
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error('No response body');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            console.log(`[SourcesPanel] Stream event:`, event.status, event);
-
-            if (event.status === 'extracting') {
-              localJobId = event.jobId; // Track locally
-              setGraphStatuses(prev => ({
-                ...prev,
-                [sourceId]: {
-                  ...prev[sourceId],
-                  extracting: true,
-                  jobId: event.jobId,
-                  jobStatus: 'processing',
-                }
-              }));
-            } else if (event.status === 'storing') {
-              setGraphStatuses(prev => ({
-                ...prev,
-                [sourceId]: {
-                  ...prev[sourceId],
-                  jobStatus: 'processing',
-                }
-              }));
-            } else if (event.status === 'started') {
-              // Background function accepted the job - keep polling
-              localJobId = event.jobId;
-              setGraphStatuses(prev => ({
-                ...prev,
-                [sourceId]: {
-                  ...prev[sourceId],
-                  extracting: true,
-                  jobId: event.jobId,
-                  jobStatus: 'processing',
-                }
-              }));
-              console.log(`[SourcesPanel] Background extraction started, job ${event.jobId}`);
-              // Trigger immediate status check then polling will take over
-              setTimeout(() => fetchGraphStatus(sourceId), 2000);
-            } else if (event.status === 'complete') {
-              setGraphStatuses(prev => ({
-                ...prev,
-                [sourceId]: {
-                  graphed: true,
-                  skillCount: event.skillCount || 0,
-                  available: true,
-                  loading: false,
-                  extracting: false,
-                  jobId: event.jobId,
-                  jobStatus: 'completed',
-                }
-              }));
-              mutate(notebookKeys.graph(notebookId));
-              mutate(notebookKeys.learningPath(notebookId));
-              console.log(`[SourcesPanel] Extraction complete: ${event.skillCount} skills`);
-            } else if (event.status === 'error') {
-              setGraphStatuses(prev => ({
-                ...prev,
-                [sourceId]: {
-                  ...prev[sourceId],
-                  extracting: false,
-                  error: event.error || 'Extraction failed',
-                  jobStatus: 'failed',
-                }
-              }));
-              console.error(`[SourcesPanel] Extraction error:`, event.error);
-            }
-            // Ignore heartbeat events
-          } catch {
-            console.warn('[SourcesPanel] Failed to parse stream line:', line);
+      // Job started successfully
+      if (data.status === 'started' && data.jobId) {
+        console.log(`[SourcesPanel] Extraction started, job ${data.jobId}`);
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: true,
+            jobId: data.jobId,
+            jobStatus: 'processing',
           }
-        }
+        }));
+        // Polling will automatically pick up this job and track completion
       }
 
-      // Stream ended - if we had a job but never got 'complete', check status
-      // This handles cases where the stream times out before completion
-      if (localJobId) {
-        const currentStatus = graphStatuses[sourceId];
-        if (currentStatus?.extracting && currentStatus?.jobStatus !== 'completed') {
-          console.log('[SourcesPanel] Stream ended without complete event, checking job status...');
-          // Keep extracting true to maintain polling, and trigger a status check
-          setTimeout(() => fetchGraphStatus(sourceId), 1000);
-        }
-      }
     } catch (err) {
       console.error('[SourcesPanel] Extraction request failed:', err);
 
-      // Check if this is a network error (connection lost, network changed, etc.)
+      // Check if this is a network error
       const isNetworkError = err instanceof TypeError &&
         (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch'));
 
-      // Use localJobId (tracked during streaming) since state update might not have completed
-      if (isNetworkError && localJobId) {
-        // Network error but job was started - poll to check actual status
-        console.log('[SourcesPanel] Network error during streaming, checking job status...');
+      if (isNetworkError) {
+        // Network error - check if job might have started anyway
+        console.log('[SourcesPanel] Network error, checking job status...');
         setGraphStatuses(prev => ({
           ...prev,
           [sourceId]: {
@@ -324,25 +236,21 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
           }
         }));
 
-        // Wait a few seconds then check the actual status
+        // Check actual status after a delay
         setTimeout(async () => {
-          console.log('[SourcesPanel] Checking extraction status after network error...');
           const data = await fetchGraphStatus(sourceId);
           if (data) {
             console.log('[SourcesPanel] Status check result:', data);
-            // If extraction completed, the status will be updated by fetchGraphStatus
-            // If still extracting, polling will continue
-            // If failed, error will be shown
           }
         }, 3000);
       } else {
-        // Actual error or job never started
+        // Actual error
         setGraphStatuses(prev => ({
           ...prev,
           [sourceId]: {
             ...prev[sourceId],
             extracting: false,
-            error: err instanceof Error ? err.message : 'Network error - please try again',
+            error: err instanceof Error ? err.message : 'Request failed',
             jobStatus: 'failed',
           }
         }));

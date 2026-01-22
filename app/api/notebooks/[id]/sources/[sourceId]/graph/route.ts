@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
+import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
+import { extractFromText } from '@/lib/pipeline/extraction'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -109,223 +110,180 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// POST /api/notebooks/[id]/sources/[sourceId]/graph - Extract graph via background function
-export async function POST(request: Request, { params }: RouteParams) {
-  const encoder = new TextEncoder()
+// Async extraction runner - fire and forget
+async function runExtractionAsync(
+  jobId: string,
+  notebookId: string,
+  sourceId: string,
+  text: string
+) {
+  const adminSupabase = createAdminClient()
 
-  // Create a streaming response for status updates
-  const stream = new TransformStream()
-  const writer = stream.writable.getWriter()
+  try {
+    console.log(`[Graph] Starting async extraction for job ${jobId}: ${text.length} chars`)
 
-  // Helper to send status updates
-  const sendStatus = async (status: string, data?: Record<string, unknown>) => {
-    const message = JSON.stringify({ status, ...data, timestamp: Date.now() }) + '\n'
-    await writer.write(encoder.encode(message))
-  }
+    // Update job to processing
+    await adminSupabase
+      .from('extraction_jobs')
+      .update({ status: 'processing', updated_at: new Date().toISOString() })
+      .eq('id', jobId)
 
-  // Process the request
-  const processRequest = async () => {
-    try {
-      const { id: notebookId, sourceId } = await params
-      const supabase = await createClient()
-      const adminSupabase = createAdminClient()
+    // Run extraction
+    const extractionResult = await extractFromText(text, notebookId, sourceId)
 
-      await sendStatus('authenticating')
+    console.log(`[Graph] Extracted ${extractionResult.skills.length} skills, storing in Neo4J`)
 
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError || !user) {
-        await sendStatus('error', { error: 'Unauthorized' })
-        return
-      }
+    // Store in Neo4J
+    await storeGraphExtraction(extractionResult)
 
-      // Verify notebook ownership
-      const { data: notebook } = await supabase
-        .from('notebooks')
-        .select('id')
-        .eq('id', notebookId)
-        .eq('user_id', user.id)
-        .single()
-
-      if (!notebook) {
-        await sendStatus('error', { error: 'Notebook not found' })
-        return
-      }
-
-      await sendStatus('checking_neo4j')
-
-      if (!isNeo4JAvailable()) {
-        await sendStatus('error', { error: 'Knowledge graph not configured' })
-        return
-      }
-
-      // Check for existing active job
-      const { data: activeJob } = await adminSupabase
-        .from('extraction_jobs')
-        .select('id, status')
-        .eq('source_id', sourceId)
-        .in('status', ['pending', 'processing'])
-        .limit(1)
-        .single()
-
-      if (activeJob) {
-        await sendStatus('error', { error: 'Extraction already in progress', jobId: activeJob.id })
-        return
-      }
-
-      await sendStatus('loading_source')
-
-      // Get source with raw_text
-      const { data: source, error: sourceError } = await adminSupabase
-        .from('sources')
-        .select('id, raw_text, title, status')
-        .eq('id', sourceId)
-        .eq('notebook_id', notebookId)
-        .single()
-
-      if (sourceError || !source) {
-        await sendStatus('error', { error: 'Source not found' })
-        return
-      }
-
-      if (source.status !== 'success') {
-        await sendStatus('error', { error: 'Source is not ready' })
-        return
-      }
-
-      let text = source.raw_text
-
-      // If no raw_text, reconstruct from chunks
-      if (!text) {
-        const { data: chunks } = await adminSupabase
-          .from('chunks')
-          .select('content')
-          .eq('source_id', sourceId)
-          .order('chunk_index', { ascending: true })
-
-        if (chunks && chunks.length > 0) {
-          text = chunks.map(c => c.content).join('\n\n')
-        }
-      }
-
-      if (!text) {
-        await sendStatus('error', { error: 'No content available' })
-        return
-      }
-
-      await sendStatus('preparing', { textLength: text.length })
-
-      // Delete existing skills for this source
-      await deleteSourceSkills(sourceId)
-
-      // Create job record with 'pending' status
-      const { data: job, error: jobError } = await adminSupabase
-        .from('extraction_jobs')
-        .insert({
-          notebook_id: notebookId,
-          source_id: sourceId,
-          user_id: user.id,
-          status: 'pending',
-        })
-        .select('id')
-        .single()
-
-      if (jobError || !job) {
-        await sendStatus('error', { error: 'Failed to create job record' })
-        return
-      }
-
-      const jobId = job.id
-      await sendStatus('extracting', { jobId, textLength: text.length })
-
-      console.log(`[Graph] Invoking background function for source ${sourceId}: ${text.length} chars`)
-
-      // Invoke the Netlify background function
-      const baseUrl = process.env.NETLIFY_URL || process.env.URL || 'http://localhost:3001'
-      const bgFunctionUrl = `${baseUrl}/.netlify/functions/extract-graph-background`
-
-      try {
-        const bgResponse = await fetch(bgFunctionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId,
-            notebookId,
-            sourceId,
-            text,
-          }),
-        })
-
-        if (!bgResponse.ok) {
-          const errorText = await bgResponse.text()
-          console.error(`[Graph] Background function error: ${bgResponse.status} ${errorText}`)
-
-          // Mark job as failed
-          await adminSupabase
-            .from('extraction_jobs')
-            .update({
-              status: 'failed',
-              error_message: `Background function failed: ${bgResponse.status}`,
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', jobId)
-
-          await sendStatus('error', { error: 'Failed to start background extraction', jobId })
-          return
-        }
-
-        console.log(`[Graph] Background function invoked successfully for job ${jobId}`)
-
-        // Update job to processing since background function accepted it
-        await adminSupabase
-          .from('extraction_jobs')
-          .update({ status: 'processing' })
-          .eq('id', jobId)
-
-        // Send started status - frontend will poll for completion
-        await sendStatus('started', {
-          jobId,
-          message: 'Extraction started in background. Poll for status updates.'
-        })
-
-      } catch (fetchError) {
-        console.error('[Graph] Failed to invoke background function:', fetchError)
-
-        // Mark job as failed
-        await adminSupabase
-          .from('extraction_jobs')
-          .update({
-            status: 'failed',
-            error_message: fetchError instanceof Error ? fetchError.message : 'Failed to invoke background function',
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
-
-        await sendStatus('error', {
-          error: 'Failed to start background extraction',
-          jobId
-        })
-      }
-
-    } catch (error) {
-      console.error('[Graph] Request processing error:', error)
-      await sendStatus('error', {
-        error: error instanceof Error ? error.message : 'Request processing failed'
+    // Update job as completed
+    await adminSupabase
+      .from('extraction_jobs')
+      .update({
+        status: 'completed',
+        skill_count: extractionResult.skills.length,
+        prerequisite_count: extractionResult.prerequisites.length,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
-    } finally {
-      await writer.close()
-    }
+      .eq('id', jobId)
+
+    console.log(`[Graph] Extraction complete for job ${jobId}: ${extractionResult.skills.length} skills`)
+
+  } catch (error) {
+    console.error(`[Graph] Extraction failed for job ${jobId}:`, error)
+
+    await adminSupabase
+      .from('extraction_jobs')
+      .update({
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId)
   }
+}
 
-  // Process request (fast - just starts the background job)
-  processRequest().catch(console.error)
+// POST /api/notebooks/[id]/sources/[sourceId]/graph - Start extraction (async)
+export async function POST(request: Request, { params }: RouteParams) {
+  try {
+    const { id: notebookId, sourceId } = await params
+    const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
-  return new Response(stream.readable, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify notebook ownership
+    const { data: notebook } = await supabase
+      .from('notebooks')
+      .select('id')
+      .eq('id', notebookId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!notebook) {
+      return NextResponse.json({ error: 'Notebook not found' }, { status: 404 })
+    }
+
+    if (!isNeo4JAvailable()) {
+      return NextResponse.json({ error: 'Knowledge graph not configured' }, { status: 503 })
+    }
+
+    // Check for existing active job
+    const { data: activeJob } = await adminSupabase
+      .from('extraction_jobs')
+      .select('id, status')
+      .eq('source_id', sourceId)
+      .in('status', ['pending', 'processing'])
+      .limit(1)
+      .single()
+
+    if (activeJob) {
+      return NextResponse.json({
+        error: 'Extraction already in progress',
+        jobId: activeJob.id
+      }, { status: 409 })
+    }
+
+    // Get source with raw_text
+    const { data: source, error: sourceError } = await adminSupabase
+      .from('sources')
+      .select('id, raw_text, title, status')
+      .eq('id', sourceId)
+      .eq('notebook_id', notebookId)
+      .single()
+
+    if (sourceError || !source) {
+      return NextResponse.json({ error: 'Source not found' }, { status: 404 })
+    }
+
+    if (source.status !== 'success') {
+      return NextResponse.json({ error: 'Source is not ready' }, { status: 400 })
+    }
+
+    let text = source.raw_text
+
+    // If no raw_text, reconstruct from chunks
+    if (!text) {
+      const { data: chunks } = await adminSupabase
+        .from('chunks')
+        .select('content')
+        .eq('source_id', sourceId)
+        .order('chunk_index', { ascending: true })
+
+      if (chunks && chunks.length > 0) {
+        text = chunks.map(c => c.content).join('\n\n')
+      }
+    }
+
+    if (!text) {
+      return NextResponse.json({ error: 'No content available' }, { status: 400 })
+    }
+
+    // Delete existing skills for this source
+    await deleteSourceSkills(sourceId)
+
+    // Create job record
+    const { data: job, error: jobError } = await adminSupabase
+      .from('extraction_jobs')
+      .insert({
+        notebook_id: notebookId,
+        source_id: sourceId,
+        user_id: user.id,
+        status: 'pending',
+      })
+      .select('id')
+      .single()
+
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'Failed to create job record' }, { status: 500 })
+    }
+
+    console.log(`[Graph] Created job ${job.id}, starting async extraction for ${text.length} chars`)
+
+    // Fire and forget - start extraction but don't wait
+    // This works on Netlify because the function continues after response
+    runExtractionAsync(job.id, notebookId, sourceId, text).catch(err => {
+      console.error('[Graph] Async extraction error:', err)
+    })
+
+    // Return immediately with job ID - frontend will poll for status
+    return NextResponse.json({
+      status: 'started',
+      jobId: job.id,
+      message: 'Extraction started. Poll GET endpoint for status.'
+    }, { status: 202 })
+
+  } catch (error) {
+    console.error('[Graph] POST error:', error)
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }, { status: 500 })
+  }
 }
 
 // DELETE /api/notebooks/[id]/sources/[sourceId]/graph - Remove source from graph
