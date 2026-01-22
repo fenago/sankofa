@@ -237,17 +237,18 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
       fetch('/api/extract-worker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Important: include cookies for auth
         body: JSON.stringify({
           jobId,
           notebookId,
           sourceId,
-          // Don't pass text - worker will fetch it to avoid large payloads
         }),
       }).then(async (workerRes) => {
         const workerData = await workerRes.json();
         console.log(`[SourcesPanel] Worker response:`, workerData);
         if (!workerRes.ok) {
           console.error(`[SourcesPanel] Worker error:`, workerData.error);
+          // If worker failed, polling will pick up the failed status
         }
       }).catch((workerErr) => {
         // Worker errors will be tracked by job status polling
