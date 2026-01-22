@@ -28,9 +28,9 @@ function getClient(): GoogleGenAI {
   return client
 }
 
-// Maximum characters to send to Gemini for extraction
-// ~30K chars ≈ ~7500 tokens, leaves room for the prompt and response
-const MAX_EXTRACTION_TEXT_LENGTH = 30000
+// Maximum characters per extraction chunk
+// Using smaller chunks = better extraction quality
+const MAX_EXTRACTION_CHUNK_SIZE = 15000
 
 /**
  * Extract skills and entities from a text chunk
@@ -43,27 +43,39 @@ export async function extractFromText(
 ): Promise<GraphExtractionResult> {
   const ai = getClient()
 
-  // Limit text size to avoid Gemini timeouts on serverless
-  let processedText = text
-  if (text.length > MAX_EXTRACTION_TEXT_LENGTH) {
-    console.log(`[Extraction] Text too long (${text.length} chars), truncating to ${MAX_EXTRACTION_TEXT_LENGTH}`)
-    // Take first and last portions to get intro and conclusion
-    const halfLimit = Math.floor(MAX_EXTRACTION_TEXT_LENGTH / 2)
-    processedText = text.slice(0, halfLimit) + '\n\n[...content truncated...]\n\n' + text.slice(-halfLimit)
+  // For large texts, process in chunks and merge results
+  if (text.length > MAX_EXTRACTION_CHUNK_SIZE) {
+    console.log(`[Extraction] Large text (${text.length} chars), processing in chunks`)
+    return extractFromTextChunked(text, notebookId, sourceDocumentId, existingSkillNames)
   }
 
   const existingContext = existingSkillNames?.length
-    ? `\n\nExisting skills in this notebook (reference these by name if the text discusses them):\n${existingSkillNames.join(', ')}`
+    ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
     : ''
 
-  console.log(`[Extraction] Starting extraction for ${processedText.length} chars`)
+  console.log(`[Extraction] Starting extraction for ${text.length} chars`)
 
-  const prompt = `Analyze the following educational content and extract:
+  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a COMPREHENSIVE knowledge graph.
 
-1. **Skills/Concepts**: Learning objectives or competencies that can be mastered
-2. **Entities**: Key terms, people, events, or concepts mentioned
-3. **Prerequisites**: Relationships where one skill must be learned before another
-4. **Entity Relationships**: How entities relate to each other
+IMPORTANT: Extract MANY skills (aim for 10-20+ per chunk of content) and MANY prerequisite relationships. Every skill should have at least one prerequisite or be a prerequisite for another skill. The goal is a rich, interconnected graph.
+
+Extract:
+1. **Skills/Concepts** (EXTRACT MANY - every topic, subtopic, technique, formula, concept, and procedure):
+   - Each section heading = at least 1 skill
+   - Each formula or technique = 1 skill
+   - Each concept or term = 1 skill
+   - Different levels of the same topic = separate skills (e.g., "Understanding Mean" vs "Calculating Mean" vs "Interpreting Mean")
+
+2. **Prerequisites** (CRITICAL - create a rich web of relationships):
+   - Basic concepts → Advanced concepts
+   - Definitions → Applications
+   - Theory → Practice
+   - Lower Bloom levels → Higher Bloom levels
+   - ALWAYS create prerequisite chains, never isolated skills
+
+3. **Entities**: Key terms, people, events, formulas, theorems mentioned
+
+4. **Entity Relationships**: How entities relate to skills and each other
 
 For each skill, determine:
 - Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
@@ -85,7 +97,7 @@ For each skill, determine:
 ${existingContext}
 
 TEXT TO ANALYZE:
-${processedText}
+${text}
 
 Respond with valid JSON matching this structure:
 {
@@ -159,7 +171,13 @@ Respond with valid JSON matching this structure:
   "existingSkillReferences": ["names of existing skills referenced in this text"]
 }
 
-Only extract skills and entities that are clearly present in the text. Be conservative - quality over quantity.`
+IMPORTANT GUIDELINES:
+- Extract MANY skills (10-20+) - err on the side of MORE extraction, not less
+- EVERY skill must connect to at least one other skill via prerequisite
+- Create prerequisite CHAINS: A → B → C → D, not just isolated pairs
+- Different cognitive levels of same topic = different skills (Remember X, Understand X, Apply X)
+- Include both theoretical knowledge AND practical skills
+- Extract ALL formulas, techniques, procedures as separate skills`
 
   let response
   try {
@@ -304,6 +322,395 @@ Only extract skills and entities that are clearly present in the text. Be conser
     entityRelationships,
     existingSkillReferences: parsed.existingSkillReferences,
   }
+}
+
+/**
+ * Process large text in chunks for better extraction
+ */
+async function extractFromTextChunked(
+  text: string,
+  notebookId: string,
+  sourceDocumentId?: string,
+  existingSkillNames?: string[]
+): Promise<GraphExtractionResult> {
+  // Split text into chunks at paragraph boundaries
+  const chunks: string[] = []
+  let currentChunk = ''
+  const paragraphs = text.split(/\n\n+/)
+
+  for (const para of paragraphs) {
+    if ((currentChunk + para).length > MAX_EXTRACTION_CHUNK_SIZE && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim())
+      currentChunk = para
+    } else {
+      currentChunk += (currentChunk ? '\n\n' : '') + para
+    }
+  }
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim())
+  }
+
+  console.log(`[Extraction] Split into ${chunks.length} chunks for processing`)
+
+  const allResults: GraphExtractionResult = {
+    skills: [],
+    prerequisites: [],
+    entities: [],
+    entityRelationships: [],
+    existingSkillReferences: [],
+  }
+
+  // Track skill names across chunks for cross-chunk relationships
+  const accumulatedSkillNames: string[] = [...(existingSkillNames || [])]
+
+  for (let i = 0; i < chunks.length; i++) {
+    console.log(`[Extraction] Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`)
+    try {
+      // Call the non-chunked version for each chunk
+      const chunkResult = await extractFromTextDirect(
+        chunks[i],
+        notebookId,
+        sourceDocumentId,
+        accumulatedSkillNames
+      )
+
+      allResults.skills.push(...chunkResult.skills)
+      allResults.prerequisites.push(...chunkResult.prerequisites)
+      allResults.entities.push(...chunkResult.entities)
+      allResults.entityRelationships.push(...chunkResult.entityRelationships)
+      if (chunkResult.existingSkillReferences) {
+        allResults.existingSkillReferences?.push(...chunkResult.existingSkillReferences)
+      }
+
+      // Add skill names for next chunk to reference
+      accumulatedSkillNames.push(...chunkResult.skills.map(s => s.name))
+
+      // Small delay between chunks
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+    } catch (error) {
+      console.error(`[Extraction] Chunk ${i + 1} failed:`, error)
+      // Continue with other chunks
+    }
+  }
+
+  // Now infer cross-chunk prerequisites based on Bloom levels
+  const inferredPrereqs = inferCrossChunkPrerequisites(allResults.skills)
+  allResults.prerequisites.push(...inferredPrereqs)
+
+  // Deduplicate
+  allResults.skills = deduplicateSkills(allResults.skills)
+  allResults.entities = deduplicateEntities(allResults.entities)
+  allResults.prerequisites = deduplicatePrerequisites(allResults.prerequisites)
+
+  console.log(`[Extraction] Final: ${allResults.skills.length} skills, ${allResults.prerequisites.length} prerequisites`)
+
+  return allResults
+}
+
+/**
+ * Direct extraction (non-chunked) - internal helper
+ */
+async function extractFromTextDirect(
+  text: string,
+  notebookId: string,
+  sourceDocumentId?: string,
+  existingSkillNames?: string[]
+): Promise<GraphExtractionResult> {
+  const ai = getClient()
+
+  const existingContext = existingSkillNames?.length
+    ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
+    : ''
+
+  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a COMPREHENSIVE knowledge graph.
+
+IMPORTANT: Extract MANY skills (aim for 10-20+ per chunk of content) and MANY prerequisite relationships. Every skill should have at least one prerequisite or be a prerequisite for another skill. The goal is a rich, interconnected graph.
+
+Extract:
+1. **Skills/Concepts** (EXTRACT MANY - every topic, subtopic, technique, formula, concept, and procedure):
+   - Each section heading = at least 1 skill
+   - Each formula or technique = 1 skill
+   - Each concept or term = 1 skill
+   - Different levels of the same topic = separate skills (e.g., "Understanding Mean" vs "Calculating Mean" vs "Interpreting Mean")
+
+2. **Prerequisites** (CRITICAL - create a rich web of relationships):
+   - Basic concepts → Advanced concepts
+   - Definitions → Applications
+   - Theory → Practice
+   - Lower Bloom levels → Higher Bloom levels
+   - ALWAYS create prerequisite chains, never isolated skills
+
+3. **Entities**: Key terms, people, events, formulas, theorems mentioned
+
+4. **Entity Relationships**: How entities relate to skills and each other
+
+For each skill, determine:
+- Bloom's Taxonomy level (1=Remember, 2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create)
+- Whether it's a "threshold concept" (transformative, troublesome knowledge that unlocks new understanding)
+- Estimated time to learn (in minutes)
+- Difficulty (1-10)
+- Keywords for the skill
+${existingContext}
+
+TEXT TO ANALYZE:
+${text}
+
+Respond with valid JSON matching this structure:
+{
+  "skills": [
+    {
+      "name": "string (unique, descriptive name)",
+      "description": "string (1-2 sentences explaining the skill)",
+      "bloomLevel": 1-6,
+      "estimatedMinutes": number,
+      "difficulty": 1-10,
+      "isThresholdConcept": boolean,
+      "keywords": ["relevant keywords"]
+    }
+  ],
+  "prerequisites": [
+    {
+      "fromSkillName": "prerequisite skill name (what must be learned FIRST)",
+      "toSkillName": "dependent skill name (what requires the prerequisite)",
+      "strength": "required" | "recommended" | "helpful",
+      "reasoning": "why this prerequisite exists"
+    }
+  ],
+  "entities": [
+    {
+      "name": "entity name",
+      "type": "concept" | "person" | "event" | "place" | "term" | "formula" | "other",
+      "description": "brief description"
+    }
+  ],
+  "entityRelationships": [
+    {
+      "fromEntityName": "source entity",
+      "toEntityName": "target entity",
+      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of",
+      "description": "optional description of relationship"
+    }
+  ],
+  "existingSkillReferences": ["names of existing skills referenced in this text"]
+}
+
+IMPORTANT GUIDELINES:
+- Extract MANY skills (10-20+) - err on the side of MORE extraction, not less
+- EVERY skill must connect to at least one other skill via prerequisite
+- Create prerequisite CHAINS: A → B → C → D, not just isolated pairs
+- Different cognitive levels of same topic = different skills (Remember X, Understand X, Apply X)
+- Include both theoretical knowledge AND practical skills
+- Extract ALL formulas, techniques, procedures as separate skills`
+
+  let response
+  try {
+    const startTime = Date.now()
+    response = await ai.models.generateContent({
+      model: EXTRACTION_MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3, // Slightly higher for more creative extraction
+      },
+    })
+    console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
+  } catch (apiError) {
+    console.error('[Extraction] Gemini API call failed:', apiError)
+    throw new Error(`Gemini API failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`)
+  }
+
+  const responseText = response.text
+  if (!responseText) {
+    throw new Error('Empty response from extraction model')
+  }
+
+  let parsed: RawExtractionResult
+  try {
+    parsed = JSON.parse(responseText)
+  } catch {
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[1])
+    } else {
+      throw new Error('Failed to parse extraction response as JSON')
+    }
+  }
+
+  console.log(`[Extraction] Parsed ${parsed.skills?.length || 0} skills, ${parsed.prerequisites?.length || 0} prerequisites`)
+
+  const now = Date.now()
+
+  // Convert to typed result with IDs
+  const skills: SkillNode[] = (parsed.skills || []).map((s, idx) => ({
+    id: `skill_${notebookId}_${now}_${idx}`,
+    name: s.name,
+    description: s.description,
+    notebookId,
+    bloomLevel: validateBloomLevel(s.bloomLevel),
+    estimatedMinutes: s.estimatedMinutes ? Math.min(120, Math.max(5, s.estimatedMinutes)) : 30,
+    difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
+    isThresholdConcept: s.isThresholdConcept || false,
+    keywords: s.keywords || [],
+    sourceDocumentId,
+    createdAt: now,
+    updatedAt: now,
+  }))
+
+  // Create skill name to ID mapping
+  const skillNameToId = new Map(skills.map(s => [s.name.toLowerCase(), s.id]))
+
+  // Also map existing skill names if provided
+  if (existingSkillNames) {
+    for (const name of existingSkillNames) {
+      if (!skillNameToId.has(name.toLowerCase())) {
+        // Create placeholder ID for existing skills
+        skillNameToId.set(name.toLowerCase(), `existing_${name.toLowerCase().replace(/\s+/g, '_')}`)
+      }
+    }
+  }
+
+  // Convert prerequisites - be more lenient with matching
+  const prerequisites: PrerequisiteRelationship[] = (parsed.prerequisites || [])
+    .map(p => {
+      const fromId = skillNameToId.get(p.fromSkillName.toLowerCase())
+      const toId = skillNameToId.get(p.toSkillName.toLowerCase())
+
+      // Skip if either skill not found
+      if (!fromId || !toId) {
+        console.log(`[Extraction] Skipping prerequisite: ${p.fromSkillName} → ${p.toSkillName} (skill not found)`)
+        return null
+      }
+
+      return {
+        fromSkillId: fromId,
+        toSkillId: toId,
+        strength: p.strength || 'recommended',
+        confidenceScore: 0.85,
+        reasoning: p.reasoning,
+        inferenceMethod: 'llm_extracted' as const,
+      }
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+
+  // Convert entities
+  const entities: EntityNode[] = (parsed.entities || []).map((e, idx) => ({
+    id: `entity_${notebookId}_${now}_${idx}`,
+    name: e.name,
+    type: e.type || 'other',
+    description: e.description,
+    notebookId,
+    sourceDocumentId,
+    createdAt: now,
+  }))
+
+  // Entity relationships
+  const entityNameToId = new Map(entities.map(e => [e.name.toLowerCase(), e.id]))
+  const entityRelationships: EntityRelationship[] = (parsed.entityRelationships || [])
+    .map(r => {
+      const fromId = entityNameToId.get(r.fromEntityName.toLowerCase())
+      const toId = entityNameToId.get(r.toEntityName.toLowerCase())
+      if (!fromId || !toId) return null
+
+      return {
+        fromEntityId: fromId,
+        toEntityId: toId,
+        type: r.type || 'related_to',
+        description: r.description,
+        confidence: 0.8,
+      }
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+
+  return {
+    skills,
+    prerequisites,
+    entities,
+    entityRelationships,
+    existingSkillReferences: parsed.existingSkillReferences,
+  }
+}
+
+/**
+ * Infer prerequisites across chunks based on Bloom levels and keywords
+ */
+function inferCrossChunkPrerequisites(skills: SkillNode[]): PrerequisiteRelationship[] {
+  const inferred: PrerequisiteRelationship[] = []
+  const now = Date.now()
+
+  for (const skill1 of skills) {
+    for (const skill2 of skills) {
+      if (skill1.id === skill2.id) continue
+
+      // Lower Bloom level → Higher Bloom level with keyword overlap
+      if (skill1.bloomLevel < skill2.bloomLevel) {
+        const keywords1 = new Set(skill1.keywords.map(k => k.toLowerCase()))
+        const keywords2 = new Set(skill2.keywords.map(k => k.toLowerCase()))
+        const overlap = [...keywords1].filter(k => keywords2.has(k))
+
+        if (overlap.length >= 1) {
+          // Check if relationship already exists
+          const exists = inferred.some(
+            r => r.fromSkillId === skill1.id && r.toSkillId === skill2.id
+          )
+          if (!exists) {
+            inferred.push({
+              fromSkillId: skill1.id,
+              toSkillId: skill2.id,
+              strength: overlap.length >= 2 ? 'recommended' : 'helpful',
+              confidenceScore: 0.6 + overlap.length * 0.1,
+              reasoning: `Bloom level progression (L${skill1.bloomLevel}→L${skill2.bloomLevel}) with shared keywords: ${overlap.join(', ')}`,
+              inferenceMethod: 'bloom_heuristic',
+            })
+          }
+        }
+      }
+    }
+  }
+
+  return inferred
+}
+
+/**
+ * Deduplicate skills by name
+ */
+function deduplicateSkills(skills: SkillNode[]): SkillNode[] {
+  const seen = new Map<string, SkillNode>()
+  for (const skill of skills) {
+    const key = skill.name.toLowerCase()
+    if (!seen.has(key)) {
+      seen.set(key, skill)
+    }
+  }
+  return Array.from(seen.values())
+}
+
+/**
+ * Deduplicate entities by name
+ */
+function deduplicateEntities(entities: EntityNode[]): EntityNode[] {
+  const seen = new Map<string, EntityNode>()
+  for (const entity of entities) {
+    const key = entity.name.toLowerCase()
+    if (!seen.has(key)) {
+      seen.set(key, entity)
+    }
+  }
+  return Array.from(seen.values())
+}
+
+/**
+ * Deduplicate prerequisites
+ */
+function deduplicatePrerequisites(prereqs: PrerequisiteRelationship[]): PrerequisiteRelationship[] {
+  const seen = new Set<string>()
+  return prereqs.filter(p => {
+    const key = `${p.fromSkillId}→${p.toSkillId}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /**
