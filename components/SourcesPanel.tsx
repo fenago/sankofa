@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, FileUp, Plus, X, Loader2, CheckCircle, Network, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,9 @@ interface GraphStatus {
   available: boolean;
   loading?: boolean;
   extracting?: boolean;
+  jobId?: string;
+  jobStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
 }
 
 interface SourcesPanelProps {
@@ -26,49 +29,72 @@ interface SourcesPanelProps {
   isLoading: boolean;
 }
 
+// Polling interval for extraction status (5 seconds)
+const POLL_INTERVAL = 5000;
+
 export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemoveSource, onAnalyze, isLoading }: SourcesPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const [activeTab, setActiveTab] = useState<"url" | "file">("url");
   const [graphStatuses, setGraphStatuses] = useState<Record<string, GraphStatus>>({});
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch graph status for all ready sources (only when notebookId is provided)
+  // Fetch graph status for a single source
+  const fetchGraphStatus = useCallback(async (sourceId: string) => {
+    if (!notebookId) return;
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
+      if (res.ok) {
+        const data = await res.json();
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            graphed: data.graphed,
+            skillCount: data.skillCount,
+            available: data.available,
+            loading: false,
+            extracting: data.extracting || false,
+            jobId: data.jobId,
+            jobStatus: data.jobStatus,
+            error: data.lastJob?.status === 'failed' ? data.lastJob.error : undefined,
+          }
+        }));
+
+        // If extraction just completed, revalidate graph data
+        if (data.graphed && data.skillCount > 0) {
+          mutate(notebookKeys.graph(notebookId));
+          mutate(notebookKeys.learningPath(notebookId));
+        }
+
+        return data;
+      }
+    } catch {
+      setGraphStatuses(prev => ({
+        ...prev,
+        [sourceId]: { ...prev[sourceId], loading: false }
+      }));
+    }
+    return null;
+  }, [notebookId]);
+
+  // Fetch graph status for all ready sources
   const fetchGraphStatuses = useCallback(async () => {
     if (!notebookId) return;
 
     const readySources = sources.filter(s => s.status === "success");
 
     for (const source of readySources) {
-      // Skip if already loading or extracting
-      if (graphStatuses[source.id]?.loading || graphStatuses[source.id]?.extracting) continue;
+      // Skip if already loading
+      if (graphStatuses[source.id]?.loading) continue;
 
-      try {
-        setGraphStatuses(prev => ({
-          ...prev,
-          [source.id]: { ...prev[source.id], loading: true }
-        }));
+      setGraphStatuses(prev => ({
+        ...prev,
+        [source.id]: { ...prev[source.id], loading: true }
+      }));
 
-        const res = await fetch(`/api/notebooks/${notebookId}/sources/${source.id}/graph`);
-        if (res.ok) {
-          const data = await res.json();
-          setGraphStatuses(prev => ({
-            ...prev,
-            [source.id]: {
-              graphed: data.graphed,
-              skillCount: data.skillCount,
-              available: data.available,
-              loading: false,
-              extracting: prev[source.id]?.extracting || false,
-            }
-          }));
-        }
-      } catch {
-        setGraphStatuses(prev => ({
-          ...prev,
-          [source.id]: { graphed: false, skillCount: 0, available: false, loading: false }
-        }));
-      }
+      await fetchGraphStatus(source.id);
     }
-  }, [sources, notebookId, graphStatuses]);
+  }, [sources, notebookId, graphStatuses, fetchGraphStatus]);
 
   // Fetch graph statuses on mount and when sources change
   useEffect(() => {
@@ -82,13 +108,50 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     }
   }, [sources, fetchGraphStatuses, graphStatuses, notebookId]);
 
+  // Poll for extraction status when any source is extracting
+  useEffect(() => {
+    if (!notebookId) return;
+
+    const extractingSources = Object.entries(graphStatuses)
+      .filter(([_, status]) => status.extracting)
+      .map(([sourceId]) => sourceId);
+
+    if (extractingSources.length > 0) {
+      // Start polling
+      if (!pollIntervalRef.current) {
+        pollIntervalRef.current = setInterval(async () => {
+          for (const sourceId of extractingSources) {
+            const data = await fetchGraphStatus(sourceId);
+            // If no longer extracting, we'll catch it in the next cycle
+            if (data && !data.extracting) {
+              console.log(`[SourcesPanel] Source ${sourceId} extraction completed`);
+            }
+          }
+        }, POLL_INTERVAL);
+      }
+    } else {
+      // Stop polling
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [notebookId, graphStatuses, fetchGraphStatus]);
+
   // Extract graph for a single source
   const handleExtractGraph = async (sourceId: string) => {
     if (!notebookId) return;
 
     setGraphStatuses(prev => ({
       ...prev,
-      [sourceId]: { ...prev[sourceId], extracting: true }
+      [sourceId]: { ...prev[sourceId], extracting: true, error: undefined }
     }));
 
     try {
@@ -96,33 +159,22 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         method: "POST",
       });
 
-      // Handle timeout gracefully
-      if (res.status === 502 || res.status === 504) {
-        // Poll after a delay
-        setTimeout(async () => {
-          const checkRes = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
-          if (checkRes.ok) {
-            const data = await checkRes.json();
-            setGraphStatuses(prev => ({
-              ...prev,
-              [sourceId]: {
-                graphed: data.graphed,
-                skillCount: data.skillCount,
-                available: data.available,
-                loading: false,
-                extracting: false,
-              }
-            }));
-            // Revalidate the notebook graph
-            mutate(notebookKeys.graph(notebookId));
-            mutate(notebookKeys.learningPath(notebookId));
-          }
-        }, 5000);
-        return;
-      }
+      const data = await res.json();
 
-      if (res.ok) {
-        const data = await res.json();
+      if (res.ok && data.async) {
+        // Async extraction started - update status with job info
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: true,
+            jobId: data.jobId,
+            jobStatus: 'pending',
+          }
+        }));
+        console.log(`[SourcesPanel] Async extraction started for source ${sourceId}, job ${data.jobId}`);
+      } else if (res.ok && !data.async) {
+        // Sync extraction completed (unlikely but handle it)
         setGraphStatuses(prev => ({
           ...prev,
           [sourceId]: {
@@ -133,34 +185,39 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
             extracting: false,
           }
         }));
-        // Revalidate the notebook graph
         mutate(notebookKeys.graph(notebookId));
         mutate(notebookKeys.learningPath(notebookId));
+      } else if (res.status === 409) {
+        // Extraction already in progress
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: true,
+            jobId: data.jobId,
+            jobStatus: data.status,
+          }
+        }));
+      } else {
+        // Error
+        setGraphStatuses(prev => ({
+          ...prev,
+          [sourceId]: {
+            ...prev[sourceId],
+            extracting: false,
+            error: data.error || 'Extraction failed',
+          }
+        }));
       }
-    } catch {
-      // Network error - poll after delay
-      setTimeout(async () => {
-        const checkRes = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
-        if (checkRes.ok) {
-          const data = await checkRes.json();
-          setGraphStatuses(prev => ({
-            ...prev,
-            [sourceId]: {
-              graphed: data.graphed,
-              skillCount: data.skillCount,
-              available: data.available,
-              loading: false,
-              extracting: false,
-            }
-          }));
-          mutate(notebookKeys.graph(notebookId));
-          mutate(notebookKeys.learningPath(notebookId));
-        }
-      }, 5000);
-    } finally {
+    } catch (err) {
+      console.error('[SourcesPanel] Extraction request failed:', err);
       setGraphStatuses(prev => ({
         ...prev,
-        [sourceId]: { ...prev[sourceId], extracting: false }
+        [sourceId]: {
+          ...prev[sourceId],
+          extracting: false,
+          error: 'Network error - please try again',
+        }
       }));
     }
   };
@@ -187,6 +244,20 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
     s.url.toLowerCase().endsWith('.txt') ||
     s.url.startsWith('file-')
   ).length;
+
+  // Get extraction status text
+  const getExtractionStatusText = (status: GraphStatus) => {
+    if (status.loading) return "Checking...";
+    if (status.extracting) {
+      if (status.jobStatus === 'pending') return "Starting...";
+      if (status.jobStatus === 'processing') return "Extracting...";
+      return "Extracting...";
+    }
+    if (status.error) return "Failed";
+    if (!status.available) return "Unavailable";
+    if (status.graphed) return "Re-extract";
+    return "Extract to Graph";
+  };
 
   return (
     <div className="flex flex-col h-full bg-white text-black p-4 gap-6 overflow-hidden max-w-full">
@@ -226,8 +297,8 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
               className="bg-white border-gray-300 text-black placeholder:text-gray-400 focus-visible:ring-black"
               disabled={isLoading}
             />
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-black text-white hover:bg-gray-800 hover:text-white font-medium"
               disabled={isLoading || !urlInput.trim()}
             >
@@ -238,8 +309,8 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         ) : (
           <div className="space-y-3">
             <label className={`relative h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 transition-colors ${
-              isLoading || fileCount >= 5 
-                ? "border-gray-200 bg-gray-100 cursor-not-allowed" 
+              isLoading || fileCount >= 5
+                ? "border-gray-200 bg-gray-100 cursor-not-allowed"
                 : "border-gray-300 bg-gray-50 cursor-pointer hover:border-gray-400"
             }`}>
               <input
@@ -313,6 +384,15 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                           <span className="text-gray-400 flex items-center gap-1 text-xs">
                             <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" /> Checking...
                           </span>
+                        ) : graphStatus.extracting ? (
+                          <span className="text-blue-600 flex items-center gap-1 text-xs">
+                            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                            {graphStatus.jobStatus === 'pending' ? 'Starting...' : 'Extracting...'}
+                          </span>
+                        ) : graphStatus.error ? (
+                          <span className="text-red-500 flex items-center gap-1 text-xs" title={graphStatus.error}>
+                            <X className="h-3 w-3 flex-shrink-0" /> Failed
+                          </span>
                         ) : graphStatus.graphed ? (
                           <span className="text-purple-600 flex items-center gap-1 text-xs">
                             <Network className="h-3 w-3 flex-shrink-0" /> {graphStatus.skillCount} skills
@@ -339,26 +419,20 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                           !graphStatus || graphStatus.loading || !graphStatus.available
                             ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"
                             : graphStatus.extracting
-                              ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"
-                              : graphStatus.graphed
-                                ? "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200"
-                                : "text-black bg-white hover:bg-gray-100 border-gray-300"
+                              ? "text-blue-500 bg-blue-50 border-blue-200 cursor-not-allowed"
+                              : graphStatus.error
+                                ? "text-red-600 bg-red-50 hover:bg-red-100 border-red-200"
+                                : graphStatus.graphed
+                                  ? "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200"
+                                  : "text-black bg-white hover:bg-gray-100 border-gray-300"
                         }`}
                       >
-                        {graphStatus?.extracting ? (
+                        {graphStatus?.extracting || graphStatus?.loading ? (
                           <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
                         ) : (
                           <Sparkles className="h-3 w-3 flex-shrink-0" />
                         )}
-                        {!graphStatus || graphStatus.loading
-                          ? "Checking..."
-                          : graphStatus.extracting
-                            ? "Extracting..."
-                            : !graphStatus.available
-                              ? "Unavailable"
-                              : graphStatus.graphed
-                                ? "Re-extract"
-                                : "Extract to Graph"}
+                        {graphStatus ? getExtractionStatusText(graphStatus) : "Checking..."}
                       </button>
                     )}
                     <button

@@ -434,6 +434,48 @@ export type Database = {
         }
         Relationships: []
       }
+      extraction_jobs: {
+        Row: {
+          id: string
+          notebook_id: string
+          source_id: string
+          user_id: string
+          status: 'pending' | 'processing' | 'completed' | 'failed'
+          skill_count: number | null
+          prerequisite_count: number | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          notebook_id: string
+          source_id: string
+          user_id: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          skill_count?: number | null
+          prerequisite_count?: number | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          notebook_id?: string
+          source_id?: string
+          user_id?: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          skill_count?: number | null
+          prerequisite_count?: number | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -491,6 +533,7 @@ export type Database = {
       source_type: 'url' | 'pdf' | 'txt'
       source_status: 'pending' | 'processing' | 'success' | 'error'
       session_status: 'active' | 'ended' | 'abandoned'
+      extraction_job_status: 'pending' | 'processing' | 'completed' | 'failed'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -519,7 +562,10 @@ export type LearnerSessionRow = Database['public']['Tables']['learner_sessions']
 export type LearnerSessionInsert = Database['public']['Tables']['learner_sessions']['Insert']
 export type InverseProfileRow = Database['public']['Tables']['inverse_profiles']['Row']
 export type InverseProfileInsert = Database['public']['Tables']['inverse_profiles']['Insert']
+export type ExtractionJobRow = Database['public']['Tables']['extraction_jobs']['Row']
+export type ExtractionJobInsert = Database['public']['Tables']['extraction_jobs']['Insert']
 
 export type SourceType = Database['public']['Enums']['source_type']
 export type SourceStatus = Database['public']['Enums']['source_status']
 export type SessionStatus = Database['public']['Enums']['session_status']
+export type ExtractionJobStatus = Database['public']['Enums']['extraction_job_status']

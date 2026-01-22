@@ -890,3 +890,118 @@ function cosineSimilarity(a: number[], b: number[]): number {
   if (magA === 0 || magB === 0) return 0
   return dotProduct / (magA * magB)
 }
+
+/**
+ * Fast extraction for per-source processing
+ * Uses a simplified prompt to complete within serverless timeout limits
+ * Limits text to 8000 chars to ensure fast completion
+ */
+export async function extractFromTextFast(
+  text: string,
+  notebookId: string,
+  sourceDocumentId?: string
+): Promise<GraphExtractionResult> {
+  const ai = getClient()
+
+  // Limit text to first 8000 chars to ensure fast completion
+  const MAX_FAST_TEXT = 8000
+  const processedText = text.length > MAX_FAST_TEXT
+    ? text.slice(0, MAX_FAST_TEXT) + '\n\n[Content truncated for fast processing...]'
+    : text
+
+  console.log(`[FastExtraction] Processing ${processedText.length} chars (original: ${text.length})`)
+
+  const prompt = `Extract skills and prerequisites from this educational content.
+
+For each skill, provide: name, description (1 sentence), bloomLevel (1-6), difficulty (1-10).
+Identify prerequisite relationships between skills.
+
+TEXT:
+${processedText}
+
+Respond with JSON:
+{
+  "skills": [{"name": "string", "description": "string", "bloomLevel": 1-6, "difficulty": 1-10, "isThresholdConcept": boolean}],
+  "prerequisites": [{"fromSkillName": "prerequisite skill", "toSkillName": "dependent skill", "strength": "required"|"recommended"|"helpful"}]
+}`
+
+  const startTime = Date.now()
+  let response
+  try {
+    response = await ai.models.generateContent({
+      model: EXTRACTION_MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
+    })
+    console.log(`[FastExtraction] Completed in ${Date.now() - startTime}ms`)
+  } catch (apiError) {
+    console.error('[FastExtraction] API failed:', apiError)
+    throw new Error(`Fast extraction failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`)
+  }
+
+  const responseText = response.text
+  if (!responseText) {
+    throw new Error('Empty response from extraction')
+  }
+
+  let parsed: { skills?: RawSkill[]; prerequisites?: RawPrerequisite[] }
+  try {
+    parsed = JSON.parse(responseText)
+  } catch {
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[1])
+    } else {
+      throw new Error('Failed to parse extraction response')
+    }
+  }
+
+  console.log(`[FastExtraction] Extracted ${parsed.skills?.length || 0} skills, ${parsed.prerequisites?.length || 0} prerequisites`)
+
+  const now = Date.now()
+
+  // Convert to typed result
+  const skills: SkillNode[] = (parsed.skills || []).map((s, idx) => ({
+    id: `skill_${notebookId}_${now}_${idx}`,
+    name: s.name,
+    description: s.description || '',
+    notebookId,
+    bloomLevel: validateBloomLevel(s.bloomLevel || 2),
+    estimatedMinutes: 30,
+    difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
+    isThresholdConcept: s.isThresholdConcept || false,
+    cognitiveLoadEstimate: 'medium' as const,
+    keywords: [],
+    sourceDocumentId,
+    createdAt: now,
+    updatedAt: now,
+  }))
+
+  const skillNameToId = new Map(skills.map(s => [s.name.toLowerCase(), s.id]))
+
+  const prerequisites: PrerequisiteRelationship[] = (parsed.prerequisites || [])
+    .map(p => {
+      const fromId = skillNameToId.get(p.fromSkillName.toLowerCase())
+      const toId = skillNameToId.get(p.toSkillName.toLowerCase())
+      if (!fromId || !toId) return null
+
+      return {
+        fromSkillId: fromId,
+        toSkillId: toId,
+        strength: p.strength || 'recommended',
+        confidenceScore: 0.8,
+        inferenceMethod: 'llm_extracted' as const,
+      }
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+
+  return {
+    skills,
+    prerequisites,
+    entities: [],
+    entityRelationships: [],
+  }
+}
