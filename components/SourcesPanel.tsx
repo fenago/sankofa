@@ -306,12 +306,12 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                         </span>
                     )}
                     {/* Graph status indicator (only when notebookId is provided) */}
-                    {notebookId && source.status === "success" && graphStatus && (
+                    {notebookId && source.status === "success" && (
                       <>
                         <span className="text-gray-300">|</span>
-                        {graphStatus.loading ? (
+                        {!graphStatus || graphStatus.loading ? (
                           <span className="text-gray-400 flex items-center gap-1 text-xs">
-                            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" /> Checking...
                           </span>
                         ) : graphStatus.graphed ? (
                           <span className="text-purple-600 flex items-center gap-1 text-xs">
@@ -321,34 +321,44 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
                           <span className="text-gray-400 flex items-center gap-1 text-xs">
                             <Network className="h-3 w-3 flex-shrink-0" /> Not graphed
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="text-orange-500 flex items-center gap-1 text-xs">
+                            <Network className="h-3 w-3 flex-shrink-0" /> Graph unavailable
+                          </span>
+                        )}
                       </>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    {/* Extract to Graph button (only when notebookId is provided) */}
-                    {notebookId && source.status === "success" && graphStatus?.available && (
+                    {/* Extract to Graph button (only when notebookId is provided and source is ready) */}
+                    {notebookId && source.status === "success" && (
                       <button
                         onClick={() => handleExtractGraph(source.id)}
-                        disabled={graphStatus.extracting}
+                        disabled={!graphStatus || graphStatus.loading || graphStatus.extracting || !graphStatus.available}
                         className={`flex-1 py-1.5 text-xs rounded border transition-colors flex items-center justify-center gap-1 ${
-                          graphStatus.extracting
+                          !graphStatus || graphStatus.loading || !graphStatus.available
                             ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"
-                            : graphStatus.graphed
-                              ? "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200"
-                              : "text-black bg-white hover:bg-gray-100 border-gray-300"
+                            : graphStatus.extracting
+                              ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"
+                              : graphStatus.graphed
+                                ? "text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200"
+                                : "text-black bg-white hover:bg-gray-100 border-gray-300"
                         }`}
                       >
-                        {graphStatus.extracting ? (
+                        {graphStatus?.extracting ? (
                           <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
                         ) : (
                           <Sparkles className="h-3 w-3 flex-shrink-0" />
                         )}
-                        {graphStatus.extracting
-                          ? "Extracting..."
-                          : graphStatus.graphed
-                            ? "Re-extract"
-                            : "Extract to Graph"}
+                        {!graphStatus || graphStatus.loading
+                          ? "Checking..."
+                          : graphStatus.extracting
+                            ? "Extracting..."
+                            : !graphStatus.available
+                              ? "Unavailable"
+                              : graphStatus.graphed
+                                ? "Re-extract"
+                                : "Extract to Graph"}
                       </button>
                     )}
                     <button
