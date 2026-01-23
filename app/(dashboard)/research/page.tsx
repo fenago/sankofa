@@ -261,6 +261,7 @@ const whitepapers = [
     title: "Inverse Profiling Whitepaper",
     description: "Comprehensive technical documentation of the Inverse Profiling system including BKT, ZPD, scaffolding, and real-time adaptation",
     path: "/docs/LearnGraph_Inverse_Profiling_Whitepaper.md",
+    slug: "inverse-profiling-whitepaper",
     icon: Brain,
     pages: "~50 pages",
   },
@@ -268,6 +269,7 @@ const whitepapers = [
     title: "Competitive Positioning",
     description: "Market analysis, competitive landscape, unique value propositions, and go-to-market strategy",
     path: "/docs/LearnGraph_Competitive_Positioning.md",
+    slug: "competitive-positioning",
     icon: TrendingUp,
     pages: "~30 pages",
   },
@@ -275,13 +277,15 @@ const whitepapers = [
     title: "Educational Research Foundations",
     description: "Detailed research foundations with evidence levels, controversies, limitations, and measurable outcomes",
     path: "/docs/LearnGraph_Educational_Research_Foundations.md",
+    slug: "educational-research-foundations",
     icon: BookOpen,
     pages: "~100 pages",
   },
   {
     title: "Theory Overview",
     description: "Quick reference guide to all 29 educational psychology frameworks (21 implemented + 8 TBD)",
-    path: "/research/learngraph_theory.md",
+    path: "/docs/learngraph_theory.md",
+    slug: "theory-overview",
     icon: FileText,
     pages: "~15 pages",
   },
@@ -380,23 +384,25 @@ export default function ResearchPage() {
             {whitepapers.map((paper) => {
               const Icon = paper.icon
               return (
-                <Card key={paper.title} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-purple-100 rounded-lg shrink-0">
-                        <Icon className="h-5 w-5 text-purple-700" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium">{paper.title}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{paper.description}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">{paper.pages}</Badge>
-                          <span className="text-xs text-gray-400">{paper.path}</span>
+                <Link key={paper.title} href={`/research/docs/${paper.slug}`}>
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-purple-300 h-full">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg shrink-0">
+                          <Icon className="h-5 w-5 text-purple-700" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium">{paper.title}</h3>
+                          <p className="text-sm text-gray-500 mt-1">{paper.description}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">{paper.pages}</Badge>
+                            <span className="text-xs text-gray-400">{paper.path}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               )
             })}
           </div>

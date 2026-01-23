@@ -4,7 +4,7 @@
  * Provides aggregated educational psychology framework data for a learner.
  *
  * GET /api/notebooks/[id]/profile/frameworks
- * Returns: FrameworkDashboard with all 8 frameworks interpreted
+ * Returns: FrameworkDashboard with all 12 educational psychology frameworks interpreted
  */
 
 import { NextResponse } from 'next/server'
@@ -76,6 +76,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       sessions: { avgDurationMin: 0, totalSessions: 0 },
       zpd: { zpdSkillCount: 0 },
       threshold: { total: 0, mastered: 0, inProgress: 0 },
+      scaffold: { avgScaffoldLevel: 3, transitionsUp: 0, transitionsDown: 0, totalSkillsWithScaffold: 0 },
     }
 
     // Fetch Neo4J data if available
@@ -176,6 +177,33 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         stats.sm2.totalScheduled = scheduledCount
         stats.sm2.avgInterval = scheduledCount > 0 ? Math.round(totalInterval / scheduledCount) : 0
+
+        // Compute scaffold stats from learner states
+        let totalScaffoldLevel = 0
+        let scaffoldCount = 0
+
+        // Count skills with scaffold levels and calculate average
+        for (const state of learnerStates) {
+          if (state.currentScaffoldLevel !== undefined) {
+            totalScaffoldLevel += state.currentScaffoldLevel
+            scaffoldCount++
+          }
+        }
+
+        // Estimate transitions based on mastery - skills at level 1-2 likely progressed up
+        // This is an approximation since we don't track individual transitions
+        const skillsAtLowScaffold = learnerStates.filter(
+          s => s.currentScaffoldLevel !== undefined && s.currentScaffoldLevel <= 2
+        ).length
+        const skillsAtHighScaffold = learnerStates.filter(
+          s => s.currentScaffoldLevel !== undefined && s.currentScaffoldLevel >= 3
+        ).length
+
+        stats.scaffold.totalSkillsWithScaffold = scaffoldCount
+        stats.scaffold.avgScaffoldLevel = scaffoldCount > 0 ? totalScaffoldLevel / scaffoldCount : 3
+        // Estimate: skills at low scaffold likely progressed up from higher scaffold
+        stats.scaffold.transitionsUp = skillsAtLowScaffold
+        stats.scaffold.transitionsDown = 0 // Can't estimate this without history
 
         await session.close()
       } catch (neo4jError) {

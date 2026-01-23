@@ -1,6 +1,6 @@
 {
   "name": "learn-graph",
-  "version": "0.2.22",
+  "version": "0.2.23",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -44,6 +44,7 @@
     "react-markdown": "^10.1.0",
     "react-zoom-pan-pinch": "^3.7.0",
     "reactflow": "^11.11.4",
+    "remark-gfm": "^4.0.1",
     "swr": "^2.3.8",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",

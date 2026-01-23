@@ -246,7 +246,7 @@ export default function ProfilePage() {
           <div>
             <h1 className="text-2xl font-bold">Learning Profile</h1>
             <p className="text-sm text-muted-foreground">
-              Your progress across 8 educational psychology frameworks
+              Your progress across 12 research-backed educational psychology frameworks
             </p>
           </div>
         </div>
@@ -340,18 +340,72 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Framework grid */}
-      <div className="mb-4">
+      {/* Framework grid - grouped by category */}
+      <div className="mb-6">
         <h2 className="text-xl font-semibold mb-1">Framework Breakdown</h2>
         <p className="text-sm text-muted-foreground mb-4">
           Click on any framework card to see detailed metrics and explanations
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {dashboard.frameworks.map((framework) => (
-          <FrameworkCard key={framework.id} framework={framework} />
-        ))}
+      {/* Core Knowledge Tracking */}
+      <div className="mb-8">
+        <h3 className="text-md font-medium text-muted-foreground mb-3 flex items-center gap-2">
+          📚 Core Knowledge Tracking
+          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">How well do you know it?</span>
+        </h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboard.frameworks
+            .filter(f => ['bkt', 'irt', 'sm2'].includes(f.id))
+            .map((framework) => (
+              <FrameworkCard key={framework.id} framework={framework} />
+            ))}
+        </div>
+      </div>
+
+      {/* Curriculum & Structure */}
+      <div className="mb-8">
+        <h3 className="text-md font-medium text-muted-foreground mb-3 flex items-center gap-2">
+          🗺️ Curriculum & Structure
+          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">Where are you in the journey?</span>
+        </h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboard.frameworks
+            .filter(f => ['bloom', 'zpd', 'threshold'].includes(f.id))
+            .map((framework) => (
+              <FrameworkCard key={framework.id} framework={framework} />
+            ))}
+        </div>
+      </div>
+
+      {/* Learner Characteristics */}
+      <div className="mb-8">
+        <h3 className="text-md font-medium text-muted-foreground mb-3 flex items-center gap-2">
+          🧠 Learner Characteristics
+          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">How do you learn best?</span>
+        </h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboard.frameworks
+            .filter(f => ['cognitive_load', 'metacognitive', 'goal_orientation'].includes(f.id))
+            .map((framework) => (
+              <FrameworkCard key={framework.id} framework={framework} />
+            ))}
+        </div>
+      </div>
+
+      {/* Learning Analytics */}
+      <div className="mb-8">
+        <h3 className="text-md font-medium text-muted-foreground mb-3 flex items-center gap-2">
+          📊 Learning Analytics
+          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">What patterns emerge?</span>
+        </h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboard.frameworks
+            .filter(f => ['error_patterns', 'learning_velocity', 'scaffold'].includes(f.id))
+            .map((framework) => (
+              <FrameworkCard key={framework.id} framework={framework} />
+            ))}
+        </div>
       </div>
 
       {/* Legend */}

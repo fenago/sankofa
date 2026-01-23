@@ -20,6 +20,10 @@ export type FrameworkId =
   | 'zpd'           // Zone of Proximal Development
   | 'threshold'     // Threshold Concepts
   | 'metacognitive' // Self-Regulated Learning / Metacognition
+  | 'goal_orientation' // Achievement Goal Theory
+  | 'error_patterns'   // Error Pattern Analysis
+  | 'learning_velocity' // Learning Velocity Analysis
+  | 'scaffold'         // Dynamic Scaffold Adaptation
 
 export type StatusLevel = 'excellent' | 'good' | 'developing' | 'needs_attention' | 'insufficient_data'
 
@@ -760,6 +764,444 @@ export function interpretMetacognitive(
 }
 
 // ============================================
+// Goal Orientation Interpreter
+// ============================================
+
+export function interpretGoalOrientation(
+  profile: InverseProfile | null
+): FrameworkStatus {
+  const motivational = profile?.motivational_indicators
+
+  if (!motivational || motivational.goalOrientation === 'unknown') {
+    return {
+      id: 'goal_orientation',
+      name: 'Achievement Goal Theory',
+      shortName: 'Goals',
+      description: 'Identifies whether you\'re motivated by mastering skills, demonstrating ability, or avoiding failure.',
+      researcher: 'Dweck & Elliot',
+      year: 1988,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'Need more learning activity to assess',
+      interpretation: 'Your goal orientation emerges from patterns in how you approach challenges.',
+      recommendation: 'Complete more practice sessions so we can understand your motivation style.',
+      icon: '🎯',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: 0,
+      minDataPoints: 5,
+    }
+  }
+
+  const orientation = motivational.goalOrientation
+  const persistence = Math.round((motivational.persistenceScore ?? 0) * 100)
+  const returnRate = Math.round((motivational.voluntaryReturnRate ?? 0) * 100)
+
+  const orientationScores: Record<string, number> = {
+    mastery: 90,
+    performance: 70,
+    avoidance: 30,
+  }
+  const score = orientationScores[orientation] ?? 50
+
+  let status: StatusLevel
+  if (orientation === 'mastery' && persistence >= 70) status = 'excellent'
+  else if (orientation === 'mastery' || persistence >= 50) status = 'good'
+  else if (orientation === 'performance') status = 'developing'
+  else status = 'needs_attention'
+
+  const descriptions: Record<string, { interpretation: string; recommendation: string }> = {
+    mastery: {
+      interpretation: 'You\'re driven by genuine understanding and skill improvement. Challenges are opportunities to grow.',
+      recommendation: 'Embrace increasingly difficult material. Your growth mindset will serve you well!',
+    },
+    performance: {
+      interpretation: 'You\'re motivated by demonstrating competence. This can drive achievement but may limit risk-taking.',
+      recommendation: 'Try viewing mistakes as learning opportunities rather than failures. Growth comes from challenge.',
+    },
+    avoidance: {
+      interpretation: 'You tend to avoid situations that might reveal gaps in knowledge. This is common but limiting.',
+      recommendation: 'Start with lower-stakes practice. Building confidence in a safe environment can shift your orientation.',
+    },
+  }
+
+  const desc = descriptions[orientation] ?? {
+    interpretation: 'Your motivation pattern is still emerging.',
+    recommendation: 'Keep practicing to clarify your goal orientation.',
+  }
+
+  return {
+    id: 'goal_orientation',
+    name: 'Achievement Goal Theory',
+    shortName: 'Goals',
+    description: 'Identifies whether you\'re motivated by mastering skills, demonstrating ability, or avoiding failure.',
+    researcher: 'Dweck & Elliot',
+    year: 1988,
+    status,
+    statusLabel: getStatusLabel(status),
+    score,
+    headline: `${orientation.charAt(0).toUpperCase() + orientation.slice(1)}-oriented learner`,
+    interpretation: desc.interpretation,
+    recommendation: desc.recommendation,
+    icon: '🎯',
+    color: getStatusColor(status),
+    metrics: [
+      { key: 'orientation', label: 'Orientation', value: orientation, description: 'Your primary motivation type' },
+      { key: 'persistence', label: 'Persistence', value: `${persistence}%`, description: 'How often you stick with difficult material', isGood: persistence >= 60 },
+      { key: 'returnRate', label: 'Return Rate', value: `${returnRate}%`, description: 'How often you voluntarily return to practice', isGood: returnRate >= 50 },
+      { key: 'sessionFrequency', label: 'Sessions/Week', value: motivational.sessionFrequency ?? 0, description: 'Average learning sessions per week' },
+    ],
+    dataQuality: (profile?.interactions_analyzed ?? 0) >= 20 ? 'good' : (profile?.interactions_analyzed ?? 0) >= 10 ? 'adequate' : 'limited',
+    dataPoints: profile?.interactions_analyzed ?? 0,
+    minDataPoints: 5,
+  }
+}
+
+// ============================================
+// Error Pattern Interpreter
+// ============================================
+
+export function interpretErrorPatterns(
+  profile: InverseProfile | null,
+  practiceStats: { totalAttempts: number; avgAccuracy: number }
+): FrameworkStatus {
+  const behavioral = profile?.behavioral_patterns
+  const errorPatterns = behavioral?.errorPatterns ?? []
+
+  if (practiceStats.totalAttempts < 10) {
+    return {
+      id: 'error_patterns',
+      name: 'Error Pattern Analysis',
+      shortName: 'Errors',
+      description: 'Identifies systematic mistakes to target specific areas for improvement.',
+      researcher: 'Siegler',
+      year: 1996,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'Need more practice attempts to analyze',
+      interpretation: 'Error patterns emerge after seeing your responses to multiple questions.',
+      recommendation: 'Complete at least 10 practice questions to begin error analysis.',
+      icon: '🔍',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: practiceStats.totalAttempts,
+      minDataPoints: 10,
+    }
+  }
+
+  const errorCount = errorPatterns.length
+  const accuracy = Math.round(practiceStats.avgAccuracy * 100)
+
+  let status: StatusLevel
+  if (errorCount === 0 && accuracy >= 80) status = 'excellent'
+  else if (errorCount <= 2 && accuracy >= 60) status = 'good'
+  else if (errorCount <= 4 || accuracy >= 40) status = 'developing'
+  else status = 'needs_attention'
+
+  // Score based on accuracy and error patterns
+  const score = Math.max(0, Math.min(100, accuracy - errorCount * 5))
+
+  let recommendation: string
+  if (errorCount === 0) {
+    recommendation = 'No systematic error patterns detected. Focus on maintaining your accuracy!'
+  } else if (errorCount <= 2) {
+    recommendation = `Review the following patterns: ${errorPatterns.slice(0, 2).join(', ')}. Targeted practice will help.`
+  } else {
+    recommendation = 'Consider revisiting foundational concepts before advancing. Multiple error patterns suggest conceptual gaps.'
+  }
+
+  return {
+    id: 'error_patterns',
+    name: 'Error Pattern Analysis',
+    shortName: 'Errors',
+    description: 'Identifies systematic mistakes to target specific areas for improvement.',
+    researcher: 'Siegler',
+    year: 1996,
+    status,
+    statusLabel: getStatusLabel(status),
+    score,
+    headline: errorCount === 0 ? 'No systematic errors detected' : `${errorCount} error pattern${errorCount > 1 ? 's' : ''} identified`,
+    interpretation: errorCount === 0
+      ? 'Your mistakes appear random rather than systematic - a good sign of solid understanding.'
+      : 'We\'ve detected patterns in your errors that suggest specific areas to focus on.',
+    recommendation,
+    icon: '🔍',
+    color: getStatusColor(status),
+    metrics: [
+      { key: 'errorPatterns', label: 'Error Patterns', value: errorCount, description: 'Number of systematic mistake types', isGood: errorCount <= 2 },
+      { key: 'accuracy', label: 'Accuracy', value: `${accuracy}%`, description: 'Overall correctness rate', isGood: accuracy >= 70 },
+      { key: 'attempts', label: 'Attempts Analyzed', value: practiceStats.totalAttempts, description: 'Practice questions analyzed' },
+      ...(errorPatterns.length > 0 ? [{
+        key: 'topError',
+        label: 'Top Pattern',
+        value: errorPatterns[0],
+        description: 'Most common error type',
+        isGood: false
+      }] : []),
+    ],
+    dataQuality: practiceStats.totalAttempts >= 30 ? 'good' : practiceStats.totalAttempts >= 15 ? 'adequate' : 'limited',
+    dataPoints: practiceStats.totalAttempts,
+    minDataPoints: 10,
+  }
+}
+
+// ============================================
+// Learning Velocity Interpreter
+// ============================================
+
+export function interpretLearningVelocity(
+  profile: InverseProfile | null,
+  skillStats: { total: number; mastered: number },
+  sessionStats: { totalSessions: number }
+): FrameworkStatus {
+  const behavioral = profile?.behavioral_patterns
+
+  if (sessionStats.totalSessions < 3 || skillStats.total === 0) {
+    return {
+      id: 'learning_velocity',
+      name: 'Learning Velocity Analysis',
+      shortName: 'Velocity',
+      description: 'Tracks how quickly you\'re progressing through the material to optimize pacing.',
+      researcher: 'Anderson',
+      year: 2000,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'Need more sessions to measure velocity',
+      interpretation: 'Learning velocity becomes meaningful after a few sessions.',
+      recommendation: 'Complete more learning sessions to establish your pace.',
+      icon: '⚡',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: sessionStats.totalSessions,
+      minDataPoints: 3,
+    }
+  }
+
+  const velocity = behavioral?.learningVelocity ?? 0
+  const avgResponseTime = behavioral?.averageResponseTime ? Math.round(behavioral.averageResponseTime / 1000) : null
+  const masteryPercent = Math.round((skillStats.mastered / skillStats.total) * 100)
+
+  // If no skills have been mastered and velocity is 0, we don't have meaningful data
+  if (velocity === 0 && skillStats.mastered === 0) {
+    return {
+      id: 'learning_velocity',
+      name: 'Learning Velocity Analysis',
+      shortName: 'Velocity',
+      description: 'Tracks how quickly you\'re progressing through the material to optimize pacing.',
+      researcher: 'Anderson',
+      year: 2000,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'No skills mastered yet',
+      interpretation: 'Learning velocity measures your rate of skill acquisition over time.',
+      recommendation: 'Start practicing to establish your learning pace.',
+      icon: '⚡',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: 0,
+      minDataPoints: 3,
+    }
+  }
+
+  // Score based on velocity (skills per week) - normalized to 0-100
+  // Assume 2-3 skills/week is good, 5+ is excellent
+  let score: number
+  if (velocity >= 5) score = 95
+  else if (velocity >= 3) score = 80
+  else if (velocity >= 1) score = 60
+  else if (velocity > 0) score = 40
+  else score = 0  // Velocity is 0 but has some mastered skills (stalled progress)
+
+  let status: StatusLevel
+  if (velocity >= 4) status = 'excellent'
+  else if (velocity >= 2) status = 'good'
+  else if (velocity >= 0.5) status = 'developing'
+  else status = 'needs_attention'
+
+  let interpretation: string
+  let recommendation: string
+
+  if (velocity >= 4) {
+    interpretation = 'You\'re progressing rapidly! Make sure you\'re retaining what you learn.'
+    recommendation = 'Consider using spaced repetition to ensure retention keeps pace with acquisition.'
+  } else if (velocity >= 2) {
+    interpretation = 'You\'re maintaining a solid learning pace.'
+    recommendation = 'Keep up the momentum. Consistency beats intensity for long-term retention.'
+  } else if (velocity >= 0.5) {
+    interpretation = 'You\'re learning at a steady pace. There\'s room to accelerate if desired.'
+    recommendation = 'Try adding one more session per week to boost your velocity.'
+  } else {
+    interpretation = 'Your learning pace is slow. This could be due to difficulty or infrequent practice.'
+    recommendation = 'Focus on shorter, more frequent sessions rather than long, sporadic ones.'
+  }
+
+  return {
+    id: 'learning_velocity',
+    name: 'Learning Velocity Analysis',
+    shortName: 'Velocity',
+    description: 'Tracks how quickly you\'re progressing through the material to optimize pacing.',
+    researcher: 'Anderson',
+    year: 2000,
+    status,
+    statusLabel: getStatusLabel(status),
+    score,
+    headline: `${velocity.toFixed(1)} skills per week`,
+    interpretation,
+    recommendation,
+    icon: '⚡',
+    color: getStatusColor(status),
+    metrics: [
+      { key: 'velocity', label: 'Learning Rate', value: `${velocity.toFixed(1)}/week`, description: 'Skills mastered per week' },
+      { key: 'mastered', label: 'Total Mastered', value: skillStats.mastered, description: 'Skills you\'ve fully learned' },
+      { key: 'sessions', label: 'Sessions', value: sessionStats.totalSessions, description: 'Learning sessions completed' },
+      ...(avgResponseTime ? [{
+        key: 'avgTime',
+        label: 'Avg Response',
+        value: `${avgResponseTime}s`,
+        description: 'Average time per question'
+      }] : []),
+    ],
+    dataQuality: sessionStats.totalSessions >= 10 ? 'good' : sessionStats.totalSessions >= 5 ? 'adequate' : 'limited',
+    dataPoints: sessionStats.totalSessions,
+    minDataPoints: 3,
+  }
+}
+
+// ============================================
+// Scaffold Adaptation Interpreter
+// ============================================
+
+export function interpretScaffoldAdaptation(
+  profile: InverseProfile | null,
+  scaffoldStats: { avgScaffoldLevel: number; transitionsUp: number; transitionsDown: number; totalSkillsWithScaffold: number }
+): FrameworkStatus {
+  const cognitive = profile?.cognitive_indicators
+
+  // Require either 3+ skills with scaffold data OR some actual scaffold transitions
+  const hasScaffoldActivity = scaffoldStats.transitionsUp > 0 || scaffoldStats.transitionsDown > 0
+  if (scaffoldStats.totalSkillsWithScaffold < 3 && !hasScaffoldActivity) {
+    return {
+      id: 'scaffold',
+      name: 'Dynamic Scaffold Adaptation',
+      shortName: 'Scaffolding',
+      description: 'Adjusts support level based on your performance - more help when struggling, less when succeeding.',
+      researcher: 'Wood, Bruner & Ross',
+      year: 1976,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'Need more practice to calibrate scaffolding',
+      interpretation: 'Scaffolding adjusts based on your performance across multiple skills.',
+      recommendation: 'Practice several skills to let the system learn your optimal support level.',
+      icon: '🏗️',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: scaffoldStats.totalSkillsWithScaffold,
+      minDataPoints: 3,
+    }
+  }
+
+  // If we have skills but no transitions yet, don't calculate a meaningful score
+  if (!hasScaffoldActivity && scaffoldStats.totalSkillsWithScaffold > 0) {
+    return {
+      id: 'scaffold',
+      name: 'Dynamic Scaffold Adaptation',
+      shortName: 'Scaffolding',
+      description: 'Adjusts support level based on your performance - more help when struggling, less when succeeding.',
+      researcher: 'Wood, Bruner & Ross',
+      year: 1976,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'Scaffolding not yet calibrated',
+      interpretation: 'The system needs to see your performance to adjust support levels.',
+      recommendation: 'Complete practice questions to let the system learn your optimal support level.',
+      icon: '🏗️',
+      color: 'gray',
+      metrics: [
+        { key: 'skillsTracked', label: 'Skills Tracked', value: scaffoldStats.totalSkillsWithScaffold, description: 'Skills with scaffold levels assigned' },
+      ],
+      dataQuality: 'insufficient',
+      dataPoints: 0,
+      minDataPoints: 3,
+    }
+  }
+
+  const avgLevel = scaffoldStats.avgScaffoldLevel
+  const netProgress = scaffoldStats.transitionsUp - scaffoldStats.transitionsDown
+  const workingMemory = cognitive?.workingMemoryIndicator ?? 'medium'
+
+  // Score based on scaffold progression (higher = less scaffolding needed = better)
+  // Level 1 = expert (90-100), Level 2 = proficient (70-89), Level 3 = developing (50-69), Level 4 = novice (0-49)
+  const levelScores: Record<number, number> = { 1: 95, 2: 75, 3: 55, 4: 35 }
+  let score = levelScores[Math.round(avgLevel)] ?? 50
+  // Bonus for positive progression
+  if (netProgress > 0) score = Math.min(100, score + netProgress * 5)
+
+  let status: StatusLevel
+  if (avgLevel <= 1.5 && netProgress >= 0) status = 'excellent'
+  else if (avgLevel <= 2.5 || netProgress > 0) status = 'good'
+  else if (avgLevel <= 3.5) status = 'developing'
+  else status = 'needs_attention'
+
+  const levelDescriptions: Record<number, string> = {
+    1: 'Expert level - Minimal support needed. You work independently.',
+    2: 'Proficient - Occasional hints helpful. You\'re becoming independent.',
+    3: 'Developing - Moderate support helps. You\'re building confidence.',
+    4: 'Foundational - Full support available. You\'re learning the basics.',
+  }
+
+  const roundedLevel = Math.round(avgLevel)
+  const levelDesc = levelDescriptions[roundedLevel] ?? 'Scaffolding is calibrating to your needs.'
+
+  let recommendation: string
+  if (netProgress > 2) {
+    recommendation = 'Great progress! You\'re advancing toward independence quickly.'
+  } else if (netProgress > 0) {
+    recommendation = 'You\'re gradually needing less support. Keep practicing!'
+  } else if (netProgress === 0) {
+    recommendation = 'Your support level is stable. Push yourself with slightly harder material.'
+  } else {
+    recommendation = 'Don\'t worry about needing more support - it\'s there to help you succeed.'
+  }
+
+  return {
+    id: 'scaffold',
+    name: 'Dynamic Scaffold Adaptation',
+    shortName: 'Scaffolding',
+    description: 'Adjusts support level based on your performance - more help when struggling, less when succeeding.',
+    researcher: 'Wood, Bruner & Ross',
+    year: 1976,
+    status,
+    statusLabel: getStatusLabel(status),
+    score,
+    headline: `Level ${roundedLevel}: ${['Expert', 'Proficient', 'Developing', 'Foundational'][roundedLevel - 1] ?? 'Calibrating'}`,
+    interpretation: levelDesc,
+    recommendation,
+    icon: '🏗️',
+    color: getStatusColor(status),
+    metrics: [
+      { key: 'avgLevel', label: 'Avg Scaffold Level', value: avgLevel.toFixed(1), description: 'Your typical support level (1=expert, 4=foundational)' },
+      { key: 'transitionsUp', label: 'Progressed Up', value: scaffoldStats.transitionsUp, description: 'Times you advanced to less support', isGood: true },
+      { key: 'transitionsDown', label: 'Stepped Back', value: scaffoldStats.transitionsDown, description: 'Times you needed more support' },
+      { key: 'workingMemory', label: 'Working Memory', value: workingMemory, description: 'Your cognitive capacity indicator' },
+    ],
+    dataQuality: scaffoldStats.totalSkillsWithScaffold >= 10 ? 'good' : scaffoldStats.totalSkillsWithScaffold >= 5 ? 'adequate' : 'limited',
+    dataPoints: scaffoldStats.totalSkillsWithScaffold,
+    minDataPoints: 3,
+  }
+}
+
+// ============================================
 // Dashboard Builder
 // ============================================
 
@@ -775,17 +1217,26 @@ export function buildFrameworkDashboard(
     sessions: { avgDurationMin: number; totalSessions: number }
     zpd: { zpdSkillCount: number }
     threshold: { total: number; mastered: number; inProgress: number }
+    scaffold: { avgScaffoldLevel: number; transitionsUp: number; transitionsDown: number; totalSkillsWithScaffold: number }
   }
 ): FrameworkDashboard {
   const frameworks: FrameworkStatus[] = [
+    // Core Knowledge Tracking
     interpretBKT(profile, stats.skills),
     interpretIRT(profile, stats.practice),
     interpretSM2(stats.sm2.dueSkills, stats.sm2.totalScheduled, stats.sm2.overdueCount, stats.sm2.avgInterval),
+    // Curriculum & Structure
     interpretBloom(stats.bloom),
-    interpretCognitiveLoad(profile, stats.sessions),
     interpretZPD(stats.zpd.zpdSkillCount, stats.skills.mastered, stats.skills.total),
     interpretThreshold(stats.threshold, profile),
+    // Learner Characteristics
+    interpretCognitiveLoad(profile, stats.sessions),
     interpretMetacognitive(profile),
+    interpretGoalOrientation(profile),
+    // Learning Analytics
+    interpretErrorPatterns(profile, stats.practice),
+    interpretLearningVelocity(profile, stats.skills, stats.sessions),
+    interpretScaffoldAdaptation(profile, stats.scaffold),
   ]
 
   // Calculate overall readiness

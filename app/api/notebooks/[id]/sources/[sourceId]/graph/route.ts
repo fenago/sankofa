@@ -80,13 +80,14 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Check for recent completed/failed jobs
+    // Note: result_data column added in migration 009, cast to handle type until types are regenerated
     const { data: recentJob } = await adminSupabase
       .from('extraction_jobs')
       .select('id, status, skill_count, error_message, completed_at, result_data')
       .eq('source_id', sourceId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .single() as { data: { id: string; status: string; skill_count: number | null; error_message: string | null; completed_at: string | null; result_data: unknown } | null }
 
     // If job is completed and has result_data, sync to Neo4J
     if (recentJob?.status === 'completed' && recentJob.result_data) {
@@ -96,10 +97,11 @@ export async function GET(request: Request, { params }: RouteParams) {
         await storeGraphExtraction(extractionResult)
 
         // Clear result_data after successful sync
-        await adminSupabase
+        // Cast to bypass type until types are regenerated
+        await (adminSupabase
           .from('extraction_jobs')
-          .update({ result_data: null })
-          .eq('id', recentJob.id)
+          .update({ result_data: null } as Record<string, unknown>)
+          .eq('id', recentJob.id))
 
         console.log(`[Graph] Synced ${extractionResult.skills.length} skills to Neo4J`)
       } catch (syncError) {

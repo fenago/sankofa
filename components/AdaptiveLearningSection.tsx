@@ -177,7 +177,7 @@ export function AdaptiveLearningSection({
               className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 hover:underline"
             >
               <BarChart3 className="h-3 w-3" />
-              View Learning Frameworks
+              View Full Profile
               <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
