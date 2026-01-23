@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2, BookOpen, GraduationCap, Users, ChevronRight } from "lucide-react";
+import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2, BookOpen, GraduationCap, Users, ChevronRight, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -311,6 +311,21 @@ export function OutputsPanel({
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/research`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-amber-300 hover:bg-amber-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
+                  <FlaskConical className="h-4 w-4 text-amber-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">Research Foundations</div>
+                  <div className="text-xs text-gray-500">29 ed psych frameworks & whitepapers</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-amber-500" />
             </Link>
           </div>
         </section>
