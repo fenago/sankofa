@@ -2,7 +2,7 @@
 
 ## AI-Powered Personalized Learning Through Knowledge Graph Intelligence
 
-**December 2024**
+**January 2025** | Version 1.1
 
 ---
 
@@ -13,7 +13,7 @@ Founder & Principal Architect
 
 ---
 
-## Executive Summary: Personalized Learning at Scale Through 12 Years of Educational Research
+## Executive Summary: Personalized Learning at Scale Through 21 Research-Backed Frameworks
 
 The promise of personalized education has long been constrained by a fundamental tension: delivering individualized learning paths requires understanding both *what* to teach and *who* is learning—at scale. Traditional adaptive learning systems attempt this through extensive upfront assessments, creating friction that reduces engagement before learning even begins.
 
@@ -87,6 +87,9 @@ This whitepaper explains the research foundations, technical architecture, and k
 - Bayesian Knowledge Tracing Integration
 - Zone of Proximal Development Operationalization
 - Adaptive Scaffolding with Cognitive Load Management
+
+**Part 7: [Future Directions](#part-7-future-directions---modern-frameworks-under-consideration)**
+- Modern Frameworks Under Consideration (TBD)
 
 **[Conclusion](#conclusion)**
 
@@ -971,6 +974,74 @@ Scaffolding decisions integrate the Inverse Profile with Cognitive Load Theory p
 
 ---
 
+## Part 7: Future Directions - Modern Frameworks Under Consideration
+
+LearnGraph continues to evolve by evaluating cutting-edge research from 2020-2025. The following frameworks are being considered for future integration:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    MODERN FRAMEWORKS UNDER EVALUATION (TBD)                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   1. DESIRABLE DIFFICULTIES (Bjork & Bjork, 2011-2024)                      │
+│   ───────────────────────────────────────────────────                       │
+│   Interleaving, spacing, retrieval practice, variation                      │
+│   Research: d=0.5-0.8 effect sizes                                          │
+│   Potential: Intentional interleaving of skills in practice sequences      │
+│                                                                              │
+│   2. PRODUCTIVE FAILURE (Kapur, 2008-2024)                                  │
+│   ─────────────────────────────────────────                                 │
+│   Struggle before instruction activates prior knowledge                     │
+│   Research: d=0.68 meta-analytic effect size                               │
+│   Potential: "Explore First" mode with minimal initial guidance            │
+│                                                                              │
+│   3. SELF-DETERMINATION THEORY (Ryan & Deci, 2020 update)                  │
+│   ────────────────────────────────────────────────────────                  │
+│   Autonomy, Competence, Relatedness for intrinsic motivation               │
+│   Research: d=0.49-0.61 across all three needs                             │
+│   Potential: Enhanced learner choice, peer learning features               │
+│                                                                              │
+│   4. EMBODIED COGNITION (Goldin-Meadow, 2019-2024)                         │
+│   ─────────────────────────────────────────────────                         │
+│   Gesture-based learning enhances cognitive processing                      │
+│   Research: d=0.32-0.55 for gesture-enhanced instruction                   │
+│   Potential: Interactive gestures for mobile, drawing tools                │
+│                                                                              │
+│   5. AI-ENHANCED SOCRATIC TUTORING (Ma et al., 2025)                       │
+│   ──────────────────────────────────────────────────                        │
+│   LLM questioning outperforms answer-giving by 2x                          │
+│   Research: Nature Human Behaviour 2025                                     │
+│   Status: Partially implemented via chat                                    │
+│                                                                              │
+│   6. ATTENTION CONTAGION (Stojic et al., 2024)                             │
+│   ────────────────────────────────────────────                              │
+│   Focus and distraction spread between learners                             │
+│   Research: 15-25% performance impact                                       │
+│   Potential: Group study recommendations, attention monitoring             │
+│                                                                              │
+│   7. MICROBREAKS FOR ATTENTION (2024-2025 studies)                         │
+│   ────────────────────────────────────────────────                          │
+│   60-90 second breaks every 10-15 minutes                                  │
+│   Research: 76% better post-test performance                               │
+│   Potential: Built-in session breaks, attention prompts                    │
+│                                                                              │
+│   8. HANDWRITING VS. TYPING (van der Meer, 2024-2025)                      │
+│   ──────────────────────────────────────────────────                        │
+│   Handwriting activates deeper memory encoding                              │
+│   Research: 25-40% better recall, EEG theta oscillation evidence           │
+│   Potential: Handwriting input option, drawing/sketching tools             │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+These frameworks represent the frontier of learning science research and will be evaluated for integration based on:
+- Strength of empirical evidence
+- Feasibility of implementation
+- Alignment with existing system architecture
+- Potential impact on learning outcomes
+
+---
+
 ## Conclusion
 
 **Inverse Profiling with LearnGraph** represents a fundamental advance in personalized learning technology. By combining:
@@ -1045,6 +1116,10 @@ Inverse Profiling with LearnGraph is not merely a tool—it is **infrastructure 
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: December 2024
+**Document Version**: 1.1
+**Last Updated**: January 2025
 **License**: This whitepaper is released under Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+### Version History
+- **1.1 (January 2025)**: Added Part 7 covering 8 modern frameworks (2020-2025) under consideration for future integration. Updated framework count to 21 implemented + 8 TBD.
+- **1.0 (December 2024)**: Initial release documenting 21 implemented educational psychology frameworks.

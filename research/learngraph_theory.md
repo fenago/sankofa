@@ -269,21 +269,126 @@ These frameworks are applied to analyze learner behavior and adapt the experienc
 
 ---
 
+## Part 3: Modern Frameworks Under Consideration (TBD)
+
+These emerging frameworks from recent research (2020-2025) are being evaluated for future integration into LearnGraph.
+
+### 1. Desirable Difficulties (TBD)
+**Researchers:** Bjork & Bjork (2011, updated research through 2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Learning conditions that make acquisition slower but enhance long-term retention and transfer |
+| **Key Techniques** | Interleaving (mixing topics), spacing (distributed practice), retrieval practice, variation |
+| **Research Evidence** | d=0.5-0.8 effect sizes for interleaving; retrieval practice outperforms re-reading by 50%+ |
+| **Potential Integration** | Question sequencing that intentionally interleaves skills; adaptive spacing algorithms; generation-before-instruction |
+| **For Learners** | Embrace productive struggle—harder practice leads to stronger long-term learning |
+| **For Educators** | Design practice that feels harder but produces better outcomes; avoid massed practice |
+
+### 2. Productive Failure (TBD)
+**Researcher:** Manu Kapur (2008-2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Deliberately engaging learners with problems BEFORE instruction, allowing them to generate and explore failed solutions |
+| **Key Mechanism** | Activates prior knowledge, reveals knowledge gaps, creates "preparation for future learning" |
+| **Research Evidence** | Meta-analysis shows d=0.68 effect size; particularly effective for conceptual understanding and transfer |
+| **Potential Integration** | "Explore First" mode that presents problems before explanations; scaffold levels that start with minimal guidance |
+| **For Learners** | Struggling before receiving help is not wasted time—it prepares your brain to learn |
+| **For Educators** | Design problem-solving tasks before direct instruction; value student-generated solutions even when incorrect |
+
+### 3. Self-Determination Theory (Enhanced) (TBD)
+**Researchers:** Ryan & Deci (2020 comprehensive update)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Intrinsic motivation requires three psychological needs: Autonomy, Competence, Relatedness |
+| **2020 Updates** | Meta-meta-analysis confirming robust effects across cultures; new insights on need frustration effects |
+| **Research Evidence** | d=0.49-0.61 across all three needs; need frustration predicts disengagement and ill-being |
+| **Potential Integration** | Autonomy: learner choice in path, pace, content; Competence: optimal challenge (ZPD), meaningful feedback; Relatedness: peer learning features, study groups |
+| **For Learners** | You learn best when you have choice, feel capable, and feel connected to others |
+| **For Educators** | Provide meaningful choices; ensure tasks are achievable; build learning communities |
+
+### 4. Embodied Cognition & Gesture-Based Learning (TBD)
+**Researchers:** Goldin-Meadow, Wilson, Alibali (2019-2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Physical movement and gesture enhance cognitive processing and memory formation |
+| **Key Findings** | Students who gesture while learning math show better retention; physical manipulation aids abstract concept formation |
+| **Research Evidence** | d=0.32-0.55 for gesture-enhanced instruction; particularly strong for spatial and mathematical reasoning |
+| **Potential Integration** | Interactive gestures for mobile learning; video demonstrations with gesture prompts; kinesthetic practice modes |
+| **For Learners** | Use your hands when thinking through problems—it literally helps your brain |
+| **For Educators** | Model gestures during instruction; encourage physical manipulation of concepts |
+
+### 5. AI-Enhanced Tutoring (TBD)
+**Research:** Ma et al. (2025, Nature Human Behaviour)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | LLM-based Socratic tutoring that guides through questions rather than providing answers |
+| **Key Finding** | Students using Socratic AI outperformed both human tutors and GPT-4 answer-giving on post-tests |
+| **Research Evidence** | 2x improvement over human tutors in experimental conditions; enhanced transfer to novel problems |
+| **Potential Integration** | Already partially implemented via chat; can enhance with structured Socratic dialogue patterns |
+| **For Learners** | AI that asks you questions helps you learn better than AI that just gives answers |
+| **For Educators** | Use AI as a questioning partner, not an answer machine |
+
+### 6. Attention & Inattention Contagion (TBD)
+**Research:** Stojic et al. (2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Attention states spread between nearby learners; both focus and distraction are contagious |
+| **Key Finding** | Students seated near distracted peers showed 15-25% performance drops; focus is equally contagious |
+| **Research Evidence** | Eye-tracking studies show attention synchronization within 2-3 minutes of proximity |
+| **Potential Integration** | Group study recommendations; attention state detection for intervention; virtual study room features |
+| **For Learners** | Choose your study environment and partners carefully—their focus affects yours |
+| **For Educators** | Strategic seating; leverage focused students as "attention anchors" |
+
+### 7. Microbreaks for Sustained Attention (TBD)
+**Research:** 2024-2025 cognitive load studies
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Brief 60-90 second breaks every 10-15 minutes dramatically improve sustained attention and retention |
+| **Key Finding** | 76% better performance on post-tests compared to continuous study |
+| **Research Evidence** | fMRI studies show working memory consolidation during micro-rest periods |
+| **Potential Integration** | Built-in practice session breaks; attention monitoring with break prompts; spaced micro-assessments |
+| **For Learners** | Short breaks aren't laziness—they're when your brain consolidates learning |
+| **For Educators** | Build pause points into lessons; treat breaks as learning infrastructure |
+
+### 8. Handwriting vs. Typing for Learning (TBD)
+**Research:** van der Meer & van der Weel (2024); multiple 2025 replications
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Handwriting activates more brain regions and produces better memory encoding than typing |
+| **Key Finding** | Handwritten notes produced 25-40% better recall than typed notes; effect persists even with laptop note-taking training |
+| **Research Evidence** | EEG studies show increased theta oscillations (memory encoding) during handwriting |
+| **Potential Integration** | Handwriting input option for practice; drawing/sketching tools for concept explanation; encourage paper notes |
+| **For Learners** | For important concepts, write by hand even if you also keep digital notes |
+| **For Educators** | Don't eliminate handwriting from instruction; use it strategically for key concepts |
+
+---
+
 ## Summary Comparison
 
-| Aspect | Content Analysis Features | Inverse Profiling Features |
-|:-------|:-------------------------|:--------------------------|
-| **When Applied** | During source processing/extraction | During learner practice sessions |
-| **Data Source** | Source documents and curriculum materials | Learner interactions and responses |
-| **Output** | Enriched knowledge graph with educational metadata | Learner profile with cognitive/metacognitive/motivational indicators |
-| **Update Frequency** | Once per extraction (can re-extract) | Real-time after every interaction |
-| **Primary Benefit** | Quality curriculum with research-grounded structure | Personalized adaptation to individual learner |
-| **Framework Count** | 9 frameworks | 12 frameworks |
+| Aspect | Content Analysis | Inverse Profiling | TBD Modern Frameworks |
+|:-------|:-----------------|:------------------|:----------------------|
+| **When Applied** | During source processing | During practice sessions | Future implementation |
+| **Data Source** | Source documents | Learner interactions | Research (2020-2025) |
+| **Output** | Educational metadata | Learner profile | Enhanced experience |
+| **Update Frequency** | Once per extraction | Real-time | Under evaluation |
+| **Primary Benefit** | Quality curriculum | Personalized adaptation | Cutting-edge science |
+| **Framework Count** | 9 frameworks | 12 frameworks | 8 frameworks |
+
+**Total Frameworks: 29** (21 implemented + 8 under consideration)
 
 ---
 
 ## References
 
+### Implemented Frameworks
 - Anderson, L. W., & Krathwohl, D. R. (2001). A taxonomy for learning, teaching, and assessing.
 - Bloom, B. S. (1968). Learning for mastery.
 - Corbett, A. T., & Anderson, J. R. (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge.
@@ -296,3 +401,12 @@ These frameworks are applied to analyze learner behavior and adapt the experienc
 - Wood, D., Bruner, J. S., & Ross, G. (1976). The role of tutoring in problem solving.
 - Wozniak, P. A. (1987). SuperMemo algorithm SM-2.
 - Zimmerman, B. J. (2002). Becoming a self-regulated learner.
+
+### TBD Modern Frameworks (2020-2025)
+- Bjork, E. L., & Bjork, R. A. (2011). Making things hard on yourself, but in a good way: Creating desirable difficulties to enhance learning. (Updated research through 2024)
+- Goldin-Meadow, S. (2019-2024). Gesture-based learning research.
+- Kapur, M. (2008-2024). Productive failure: Cognition, learning, and development.
+- Ma, S., et al. (2025). Large language model-based Socratic tutoring. Nature Human Behaviour.
+- Ryan, R. M., & Deci, E. L. (2020). Self-determination theory: Basic psychological needs in motivation, development, and wellness.
+- Stojic, H., et al. (2024). Attention contagion in learning environments.
+- van der Meer, A. L. H., & van der Weel, F. R. R. (2024). Handwriting versus keyboarding: Impact on brain development.

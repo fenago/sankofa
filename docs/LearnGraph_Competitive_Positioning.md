@@ -1,8 +1,10 @@
 # LearnGraph (jali): Competitive Positioning Strategy
 
+**Updated: January 2025** | Version 1.1
+
 ## Executive Summary
 
-**LearnGraph** is the world's first **AI-powered learning path generator** that transforms any educational content—syllabi, textbooks, learning objectives—into a structured knowledge graph optimized for personalized learning. Available as `jali` on npm, our platform empowers educators to create **mastery-based learning paths** by automatically decomposing content into skills, competencies, and their prerequisite relationships, all grounded in proven educational psychology frameworks like Zone of Proximal Development (ZPD), Bloom's Taxonomy, and spaced repetition.
+**LearnGraph** is the world's first **AI-powered learning path generator** that transforms any educational content—syllabi, textbooks, learning objectives—into a structured knowledge graph optimized for personalized learning. Available as `jali` on npm, our platform empowers educators to create **mastery-based learning paths** by automatically decomposing content into skills, competencies, and their prerequisite relationships, all grounded in **21 research-backed educational psychology frameworks** including Zone of Proximal Development (ZPD), Bloom's Taxonomy, Bayesian Knowledge Tracing (BKT), SM-2 spaced repetition, and Cognitive Load Theory—with 8 additional modern frameworks (2020-2025) under active evaluation.
 
 ## Market Positioning Statement
 
@@ -95,6 +97,49 @@ Our competition exists across multiple categories. Our strategy is to integrate 
 ```
 
 **LearnGraph is the missing middleware** that connects AI capabilities to educational best practices and graph storage.
+
+### Research Foundation: 29 Educational Psychology Frameworks
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     EDUCATIONAL PSYCHOLOGY FRAMEWORK COUNT                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  CONTENT ANALYSIS (9 Implemented)              │  Bloom's Taxonomy          │
+│  ─────────────────────────────────             │  IRT 3-Parameter Model     │
+│  Applied during source processing              │  Threshold Concepts        │
+│  to build educational knowledge graph          │  Cognitive Load Theory     │
+│                                                │  Instructional Scaffolding │
+│                                                │  Mastery Learning          │
+│                                                │  Misconception Detection   │
+│                                                │  Spaced Repetition         │
+│                                                │  Prerequisite Mapping      │
+│                                                                              │
+│  INVERSE PROFILING (12 Implemented)            │  Bayesian Knowledge Tracing│
+│  ─────────────────────────────────             │  Zone of Proximal Dev.     │
+│  Applied during learning to adapt              │  SM-2 Algorithm            │
+│  in real-time to each learner                  │  Dynamic Scaffolding       │
+│                                                │  Metacognitive Calibration │
+│                                                │  Help-Seeking Analysis     │
+│                                                │  Goal Orientation          │
+│                                                │  Working Memory Estimation │
+│                                                │  Persistence Tracking      │
+│                                                │  Error Pattern Analysis    │
+│                                                │  Confidence-Performance Gap│
+│                                                │  Learning Velocity         │
+│                                                                              │
+│  MODERN TBD (8 Under Evaluation)               │  Desirable Difficulties    │
+│  ─────────────────────────────                 │  Productive Failure        │
+│  2020-2025 research being evaluated            │  Self-Determination Theory │
+│  for future integration                        │  Embodied Cognition        │
+│                                                │  AI Socratic Tutoring      │
+│                                                │  Attention Contagion       │
+│                                                │  Microbreaks               │
+│                                                │  Handwriting vs. Typing    │
+│                                                                              │
+│  TOTAL: 21 Implemented + 8 TBD = 29 Frameworks                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -582,7 +627,30 @@ The educator community becomes a moat:
 
 ## Sources
 
+### Technical
 - [Neo4j Licensing](https://neo4j.com/licensing/)
 - [neo4j-driver npm](https://www.npmjs.com/package/neo4j-driver/v/5.13.0)
 - [LevelGraph GitHub](https://github.com/levelgraph/levelgraph)
 - [LevelGraph npm](https://www.npmjs.com/package/levelgraph)
+
+### Educational Psychology Foundations (Implemented)
+- Anderson, L. W., & Krathwohl, D. R. (2001). A taxonomy for learning, teaching, and assessing.
+- Corbett, A. T., & Anderson, J. R. (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge.
+- Lord, F. M. (1980). Applications of item response theory to practical testing problems.
+- Meyer, J., & Land, R. (2003). Threshold concepts and troublesome knowledge.
+- Sweller, J. (1988). Cognitive load during problem solving.
+- Vygotsky, L. S. (1978). Mind in society.
+- Wozniak, P. A. (1987). SuperMemo algorithm SM-2.
+- Zimmerman, B. J. (2002). Becoming a self-regulated learner.
+
+### Modern Research Under Evaluation (2020-2025)
+- Bjork, E. L., & Bjork, R. A. (2011-2024). Desirable difficulties research.
+- Kapur, M. (2008-2024). Productive failure meta-analyses.
+- Ma, S., et al. (2025). Large language model-based Socratic tutoring. Nature Human Behaviour.
+- Ryan, R. M., & Deci, E. L. (2020). Self-determination theory comprehensive update.
+- van der Meer, A. L. H., & van der Weel, F. R. R. (2024). Handwriting versus keyboarding research.
+
+---
+
+**Document Version**: 1.1
+**Last Updated**: January 2025

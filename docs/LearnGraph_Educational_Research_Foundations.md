@@ -1,5 +1,7 @@
 # LearnGraph: Educational Research Foundations & Learning Impact Measurement
 
+**Updated: January 2025** | Version 1.1
+
 ## Document Purpose
 
 This document provides:
@@ -1853,6 +1855,86 @@ This means students using Jali should:
 
 ---
 
+---
+
+## PART 4: MODERN FRAMEWORKS UNDER CONSIDERATION (2020-2025)
+
+The following 8 frameworks represent cutting-edge research being evaluated for future integration into LearnGraph:
+
+### 1. Desirable Difficulties (Bjork & Bjork, 2011-2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Learning conditions that make acquisition slower but enhance long-term retention and transfer |
+| **Evidence Level** | Strong (d=0.5-0.8 for interleaving; retrieval practice outperforms re-reading by 50%+) |
+| **Potential Integration** | Question sequencing with intentional skill interleaving; generation-before-instruction |
+| **Evaluation Status** | TBD - High priority |
+
+### 2. Productive Failure (Kapur, 2008-2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Engaging learners with problems BEFORE instruction activates prior knowledge and reveals gaps |
+| **Evidence Level** | Strong (d=0.68 meta-analytic effect; particularly effective for conceptual understanding) |
+| **Potential Integration** | "Explore First" mode; scaffold levels starting with minimal guidance |
+| **Evaluation Status** | TBD - High priority |
+
+### 3. Self-Determination Theory (Ryan & Deci, 2020 Update)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Autonomy, Competence, and Relatedness as psychological needs for intrinsic motivation |
+| **Evidence Level** | Strong (d=0.49-0.61 across all three needs; robust across cultures) |
+| **Potential Integration** | Enhanced learner choice in path/pace; peer learning features |
+| **Evaluation Status** | TBD - Medium priority |
+
+### 4. Embodied Cognition / Gesture-Based Learning (Goldin-Meadow, 2019-2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Physical movement and gesture enhance cognitive processing and memory formation |
+| **Evidence Level** | Moderate (d=0.32-0.55; strongest for spatial/mathematical reasoning) |
+| **Potential Integration** | Interactive gestures for mobile; drawing/sketching tools |
+| **Evaluation Status** | TBD - Lower priority |
+
+### 5. AI-Enhanced Socratic Tutoring (Ma et al., Nature 2025)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | LLM-based questioning guides learners rather than providing answers |
+| **Evidence Level** | Emerging (2x improvement over human tutors in experimental conditions) |
+| **Potential Integration** | Already partially implemented via chat; can enhance with structured dialogue |
+| **Evaluation Status** | TBD - Partially implemented |
+
+### 6. Attention Contagion (Stojic et al., 2024)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Focus and distraction spread between nearby learners |
+| **Evidence Level** | Emerging (15-25% performance impact from proximity effects) |
+| **Potential Integration** | Group study recommendations; attention state detection |
+| **Evaluation Status** | TBD - Research phase |
+
+### 7. Microbreaks for Sustained Attention (2024-2025 Studies)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | 60-90 second breaks every 10-15 minutes improve attention and retention |
+| **Evidence Level** | Moderate (76% better post-test performance; fMRI consolidation evidence) |
+| **Potential Integration** | Built-in session breaks; attention monitoring with break prompts |
+| **Evaluation Status** | TBD - Medium priority |
+
+### 8. Handwriting vs. Typing (van der Meer, 2024-2025)
+
+| Aspect | Details |
+|--------|---------|
+| **Core Concept** | Handwriting activates more brain regions and produces better memory encoding |
+| **Evidence Level** | Moderate (25-40% better recall; EEG theta oscillation evidence) |
+| **Potential Integration** | Handwriting input option; drawing/sketching for concept explanation |
+| **Evaluation Status** | TBD - Lower priority |
+
+---
+
 ## Sources
 
 ### Learning Styles (Debunked)
@@ -1952,3 +2034,21 @@ This means students using Jali should:
 - [Cornell - Measuring Student Learning](https://teaching.cornell.edu/teaching-resources/assessment-evaluation/measuring-student-learning)
 - [ResearchGate - Measuring Learning Gains Pre/Post](https://www.researchgate.net/publication/328374349_Measuring_students_learning_gains_with_prepost_assessment)
 - [PMC - Normalized Gain Method](https://pmc.ncbi.nlm.nih.gov/articles/PMC11590208/)
+
+### Modern Frameworks Under Consideration (2020-2025)
+- [Bjork & Bjork - Desirable Difficulties Research](https://bjorklab.psych.ucla.edu/research/)
+- [Kapur - Productive Failure](https://www.manukapur.com/productive-failure/)
+- [Ryan & Deci - Self-Determination Theory 2020 Update](https://selfdeterminationtheory.org/)
+- [Goldin-Meadow - Gesture and Learning](https://goldin-meadow-lab.uchicago.edu/)
+- [Ma et al. 2025 - AI Tutoring in Nature Human Behaviour](https://www.nature.com/articles/s41562-024-02067-6)
+- [Stojic et al. 2024 - Attention Contagion Studies]
+- [van der Meer 2024 - Handwriting vs Typing Research](https://www.frontiersin.org/journals/psychology)
+
+---
+
+**Document Version**: 1.1
+**Last Updated**: January 2025
+
+### Version History
+- **1.1 (January 2025)**: Added Part 4 covering 8 modern frameworks (2020-2025) under consideration.
+- **1.0 (December 2024)**: Initial comprehensive documentation of research foundations.
