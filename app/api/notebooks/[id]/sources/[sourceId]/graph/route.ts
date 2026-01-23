@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
-import { extractFromText } from '@/lib/pipeline/extraction'
+import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -110,13 +109,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// POST /api/notebooks/[id]/sources/[sourceId]/graph - Run extraction synchronously
-// Note: Netlify has a 26s timeout. If extraction takes longer, it will timeout.
-// The job tracking allows the frontend to poll for completion.
+// POST /api/notebooks/[id]/sources/[sourceId]/graph - Start extraction via Supabase Edge Function
+// The edge function runs with 150s timeout and handles the actual extraction
 export async function POST(request: Request, { params }: RouteParams) {
-  const startTime = Date.now()
-  let jobId: string | undefined
-
   try {
     const { id: notebookId, sourceId } = await params
     const supabase = await createClient()
@@ -159,10 +154,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 409 })
     }
 
-    // Get source with raw_text
+    // Get source to verify it exists and is ready
     const { data: source, error: sourceError } = await adminSupabase
       .from('sources')
-      .select('id, raw_text, title, status')
+      .select('id, title, status, raw_text')
       .eq('id', sourceId)
       .eq('notebook_id', notebookId)
       .single()
@@ -175,22 +170,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Source is not ready' }, { status: 400 })
     }
 
-    let text = source.raw_text
-
-    // If no raw_text, reconstruct from chunks
-    if (!text) {
-      const { data: chunks } = await adminSupabase
+    // Check if there's content available
+    let hasContent = !!source.raw_text
+    if (!hasContent) {
+      const { count } = await adminSupabase
         .from('chunks')
-        .select('content')
+        .select('*', { count: 'exact', head: true })
         .eq('source_id', sourceId)
-        .order('chunk_index', { ascending: true })
-
-      if (chunks && chunks.length > 0) {
-        text = chunks.map(c => c.content).join('\n\n')
-      }
+      hasContent = (count || 0) > 0
     }
 
-    if (!text) {
+    if (!hasContent) {
       return NextResponse.json({ error: 'No content available' }, { status: 400 })
     }
 
@@ -204,7 +194,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         notebook_id: notebookId,
         source_id: sourceId,
         user_id: user.id,
-        status: 'processing', // Start as processing since we're running now
+        status: 'pending',
       })
       .select('id')
       .single()
@@ -213,61 +203,50 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to create job record' }, { status: 500 })
     }
 
-    jobId = job.id
-    console.log(`[Graph] Starting extraction job ${job.id} for ${text.length} chars`)
+    console.log(`[Graph] Created job ${job.id}, invoking Supabase Edge Function`)
 
-    // Run extraction synchronously
-    const extractionResult = await extractFromText(text, notebookId, sourceId)
+    // Call Supabase Edge Function (fire-and-forget)
+    // The edge function will update job status when complete
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    console.log(`[Graph] Extracted ${extractionResult.skills.length} skills, ${extractionResult.prerequisites.length} prerequisites in ${Date.now() - startTime}ms`)
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase configuration missing')
+    }
 
-    // Store in Neo4J
-    await storeGraphExtraction(extractionResult)
-    console.log(`[Graph] Stored in Neo4J`)
-
-    // Update job as completed
-    await adminSupabase
-      .from('extraction_jobs')
-      .update({
-        status: 'completed',
-        skill_count: extractionResult.skills.length,
-        prerequisite_count: extractionResult.prerequisites.length,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', job.id)
-
-    console.log(`[Graph] Job ${job.id} completed in ${Date.now() - startTime}ms`)
-
-    return NextResponse.json({
-      status: 'completed',
-      jobId: job.id,
-      skillCount: extractionResult.skills.length,
-      prerequisiteCount: extractionResult.prerequisites.length,
-      durationMs: Date.now() - startTime
+    // Invoke edge function without awaiting (fire-and-forget)
+    fetch(`${supabaseUrl}/functions/v1/extract-graph`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+      },
+      body: JSON.stringify({
+        jobId: job.id,
+        notebookId,
+        sourceId,
+      }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error(`[Graph] Edge function error: ${res.status} - ${errorText}`)
+      } else {
+        const result = await res.json()
+        console.log(`[Graph] Edge function completed:`, result)
+      }
+    }).catch((err) => {
+      console.error(`[Graph] Edge function call failed:`, err)
     })
+
+    // Return immediately - frontend will poll for completion
+    return NextResponse.json({
+      status: 'started',
+      jobId: job.id,
+      message: 'Extraction started via Supabase Edge Function'
+    }, { status: 202 })
 
   } catch (error) {
     console.error('[Graph] POST error:', error)
-
-    // Try to mark job as failed
-    if (jobId) {
-      try {
-        const adminSupabase = createAdminClient()
-        await adminSupabase
-          .from('extraction_jobs')
-          .update({
-            status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
-      } catch (updateError) {
-        console.error('[Graph] Failed to update job status:', updateError)
-      }
-    }
-
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Internal server error'
     }, { status: 500 })

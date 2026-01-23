@@ -217,23 +217,12 @@ export function SourcesPanel({ notebookId, sources, onAddUrl, onAddFile, onRemov
         throw new Error('No job ID returned from server');
       }
 
-      // Extraction is now running synchronously in the graph route
-      // The request may take a while but we don't block the UI
+      // Extraction is now running via Supabase Edge Function
+      // The edge function has 150s timeout and will update job status
       const jobId = createData.jobId;
+      console.log(`[SourcesPanel] Job ${jobId} started via Supabase Edge Function. Polling for completion...`);
 
-      // If we get a completed status, extraction finished within the request
-      if (createData.status === 'completed') {
-        console.log(`[SourcesPanel] Extraction completed immediately: ${createData.skillCount} skills in ${createData.durationMs}ms`);
-
-        // Refresh graph status
-        await fetchGraphStatus(sourceId);
-        return;
-      }
-
-      // Otherwise extraction is still running - polling will track it
-      console.log(`[SourcesPanel] Job ${jobId} started, ${createData.textLength || 'unknown'} chars. Polling for completion...`);
-
-      // Update state with job ID
+      // Update state with job ID - polling will track completion
       setGraphStatuses(prev => ({
         ...prev,
         [sourceId]: {

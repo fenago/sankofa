@@ -5,24 +5,14 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Increase function timeout for heavy processing (scraping, embeddings)
-# Default is 10s, Pro plans allow up to 26s
+# API routes are handled by Next.js plugin
 [functions]
-  directory = "netlify/functions"
   external_node_modules = ["unpdf", "neo4j-driver"]
   node_bundler = "esbuild"
 
 [functions."api/*"]
-  # Maximum timeout for API routes (26s on Pro, 10s on Free)
+  # Maximum timeout for API routes (26s on Pro)
   timeout = 26
-
-# Allow longer timeout for extraction worker (Pro plans)
-[functions."api/extract-worker"]
-  timeout = 300
-
-# Background function for long-running graph extraction (up to 15 minutes)
-[functions."extract-graph-background"]
-  timeout = 900
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
