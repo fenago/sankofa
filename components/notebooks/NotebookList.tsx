@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { NotebookCard } from './NotebookCard'
 import { CreateNotebookDialog } from './CreateNotebookDialog'
 import { useNotebooks } from '@/hooks/useNotebooks'
-import { Loader2, BookOpen, FlaskConical, ChevronRight } from 'lucide-react'
+import { Loader2, BookOpen, FlaskConical } from 'lucide-react'
 
 export function NotebookList() {
   const { notebooks, loading, error, createNotebook, deleteNotebook } = useNotebooks()
@@ -38,21 +38,15 @@ export function NotebookList() {
       </div>
 
       {/* Research Foundations Link */}
-      <Link
-        href="/research"
-        className="flex items-center justify-between p-4 mb-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 hover:border-amber-300 hover:shadow-md transition-all group"
-      >
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
-            <FlaskConical className="h-6 w-6 text-amber-600" />
-          </div>
-          <div>
-            <div className="font-semibold text-gray-900">Research Foundations</div>
-            <div className="text-sm text-gray-500">29 educational psychology frameworks powering LearnGraph</div>
-          </div>
-        </div>
-        <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-amber-500 transition-colors" />
-      </Link>
+      <div className="mb-4 text-right">
+        <Link
+          href="/research"
+          className="text-sm text-gray-500 hover:text-amber-600 hover:underline inline-flex items-center gap-1"
+        >
+          <FlaskConical className="h-3 w-3" />
+          Research Foundations (29 frameworks)
+        </Link>
+      </div>
 
       {notebooks.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
