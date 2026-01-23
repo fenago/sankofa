@@ -12,6 +12,40 @@ export interface GraphSkill {
   notebookId: string
   sourceDocumentId?: string
   level?: number
+  // Educational psychology metadata
+  bloomLevel?: number
+  secondaryBloomLevels?: number[]
+  estimatedMinutes?: number
+  difficulty?: number
+  // IRT 3PL parameters
+  irtDifficulty?: number
+  irtDiscrimination?: number
+  irtGuessing?: number
+  // Threshold concepts
+  isThresholdConcept?: boolean
+  thresholdProperties?: {
+    unlocksDomains?: string[]
+    troublesomeAspects?: string[]
+  }
+  // Cognitive load
+  cognitiveLoadEstimate?: 'low' | 'medium' | 'high'
+  elementInteractivity?: 'low' | 'medium' | 'high'
+  chunksRequired?: number
+  // Mastery learning
+  masteryThreshold?: number
+  assessmentTypes?: string[]
+  suggestedAssessments?: string // JSON string
+  // Spaced repetition
+  reviewIntervals?: number[]
+  // Scaffolding
+  scaffoldingLevels?: string // JSON string
+  // Domain
+  domain?: string
+  subdomain?: string
+  keywords?: string[]
+  // Misconceptions & transfer
+  commonMisconceptions?: string[]
+  transferDomains?: string[]
 }
 
 export interface GraphEntity {

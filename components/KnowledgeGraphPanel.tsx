@@ -11,7 +11,8 @@ import ReactFlow, {
   MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen, Trash2 } from "lucide-react";
+import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen, Trash2, Database, CheckCircle2, FileText, Brain, GitBranch } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,9 +31,38 @@ interface Skill {
   name: string;
   description?: string;
   bloomLevel?: number;
+  secondaryBloomLevels?: number[];
   difficulty?: number;
+  estimatedMinutes?: number;
   keywords?: string[];
   isThresholdConcept?: boolean;
+  // IRT 3PL parameters
+  irtDifficulty?: number;
+  irtDiscrimination?: number;
+  irtGuessing?: number;
+  // Threshold properties
+  thresholdProperties?: {
+    unlocksDomains?: string[];
+    troublesomeAspects?: string[];
+  };
+  // Cognitive load
+  cognitiveLoadEstimate?: 'low' | 'medium' | 'high';
+  elementInteractivity?: 'low' | 'medium' | 'high';
+  chunksRequired?: number;
+  // Mastery
+  masteryThreshold?: number;
+  assessmentTypes?: string[];
+  suggestedAssessments?: string;
+  // Spaced repetition
+  reviewIntervals?: number[];
+  // Scaffolding
+  scaffoldingLevels?: string;
+  // Domain
+  domain?: string;
+  subdomain?: string;
+  // Misconceptions & transfer
+  commonMisconceptions?: string[];
+  transferDomains?: string[];
 }
 
 interface Entity {
@@ -83,9 +113,63 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
 
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities" | "metadata">("graph");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Extraction progress state
+  const [extractionStartTime, setExtractionStartTime] = useState<number | null>(null);
+  const [extractionStep, setExtractionStep] = useState<number>(0);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const extractionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Extraction steps for progress display
+  const extractionSteps = [
+    { label: "Preparing sources", icon: FileText },
+    { label: "Analyzing content", icon: Brain },
+    { label: "Extracting skills", icon: BookOpen },
+    { label: "Building relationships", icon: GitBranch },
+    { label: "Finalizing graph", icon: Network },
+  ];
+
+  // Update elapsed time during extraction
+  useEffect(() => {
+    if (isExtracting && extractionStartTime) {
+      extractionTimerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - extractionStartTime) / 1000);
+        setElapsedTime(elapsed);
+
+        // Progress through steps based on time
+        if (elapsed < 5) setExtractionStep(0);
+        else if (elapsed < 15) setExtractionStep(1);
+        else if (elapsed < 40) setExtractionStep(2);
+        else if (elapsed < 60) setExtractionStep(3);
+        else setExtractionStep(4);
+      }, 1000);
+
+      return () => {
+        if (extractionTimerRef.current) {
+          clearInterval(extractionTimerRef.current);
+        }
+      };
+    }
+  }, [isExtracting, extractionStartTime]);
+
+  // Format elapsed time
+  const formatElapsedTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  // Get help text based on elapsed time
+  const getExtractionHelpText = () => {
+    if (elapsedTime > 120) return "Large documents can take 2-4 minutes. Almost there...";
+    if (elapsedTime > 60) return "Building comprehensive knowledge graph...";
+    if (elapsedTime > 30) return "Analyzing relationships between concepts...";
+    return "Extracting skills and concepts from your sources...";
+  };
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -96,6 +180,10 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   const triggerExtraction = useCallback(async () => {
     setIsExtracting(true);
     setExtractionError(null);
+    setExtractionStartTime(Date.now());
+    setExtractionStep(0);
+    setElapsedTime(0);
+
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/graph`, {
         method: "POST",
@@ -132,6 +220,10 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
       }, 5000);
     } finally {
       setIsExtracting(false);
+      setExtractionStartTime(null);
+      if (extractionTimerRef.current) {
+        clearInterval(extractionTimerRef.current);
+      }
     }
   }, [notebookId]);
 
@@ -366,6 +458,17 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
               <Users className="h-3 w-3" />
               Entities ({entityCount})
             </button>
+            <button
+              onClick={() => setActiveTab("metadata")}
+              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                activeTab === "metadata"
+                  ? "border-black text-black"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Database className="h-3 w-3" />
+              Meta Data
+            </button>
           </div>
 
           {/* Graph View */}
@@ -476,8 +579,253 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
               ))}
             </div>
           )}
+
+          {/* Meta Data View */}
+          {activeTab === "metadata" && (
+            <div className={`overflow-y-auto space-y-4 ${expanded ? "flex-1" : "max-h-[380px]"}`}>
+              {graphData?.skills.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="p-4 bg-white rounded-lg border border-gray-200"
+                >
+                  <h4 className="font-semibold text-sm text-gray-900 mb-3 pb-2 border-b">{skill.name}</h4>
+
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    {/* Bloom's Taxonomy */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Bloom&apos;s Taxonomy</h5>
+                      <div className="text-gray-600">
+                        <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded mr-1">
+                          L{skill.bloomLevel || "?"}
+                        </span>
+                        {skill.secondaryBloomLevels && skill.secondaryBloomLevels.length > 0 && (
+                          <span className="text-gray-400">
+                            + {skill.secondaryBloomLevels.join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Difficulty & Time */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Difficulty & Time</h5>
+                      <div className="text-gray-600">
+                        <span>Difficulty: {skill.difficulty || "?"}/10</span>
+                        <span className="mx-2">•</span>
+                        <span>{skill.estimatedMinutes || "?"} min</span>
+                      </div>
+                    </div>
+
+                    {/* IRT Parameters */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">IRT 3PL Parameters</h5>
+                      <div className="text-gray-600 space-y-0.5">
+                        <div>b (difficulty): {skill.irtDifficulty?.toFixed(2) || "N/A"}</div>
+                        <div>a (discrimination): {skill.irtDiscrimination?.toFixed(2) || "N/A"}</div>
+                        <div>c (guessing): {skill.irtGuessing?.toFixed(2) || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    {/* Cognitive Load */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Cognitive Load</h5>
+                      <div className="text-gray-600 space-y-0.5">
+                        <div>Load: <span className={`px-1.5 py-0.5 rounded ${
+                          skill.cognitiveLoadEstimate === 'low' ? 'bg-green-100 text-green-700' :
+                          skill.cognitiveLoadEstimate === 'high' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>{skill.cognitiveLoadEstimate || "medium"}</span></div>
+                        <div>Chunks: {skill.chunksRequired || "?"}</div>
+                        <div>Interactivity: {skill.elementInteractivity || "medium"}</div>
+                      </div>
+                    </div>
+
+                    {/* Mastery */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Mastery Learning</h5>
+                      <div className="text-gray-600 space-y-0.5">
+                        <div>Threshold: {((skill.masteryThreshold || 0.8) * 100).toFixed(0)}%</div>
+                        {skill.assessmentTypes && skill.assessmentTypes.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {skill.assessmentTypes.map((t, i) => (
+                              <span key={i} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">{t}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Spaced Repetition */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Review Intervals</h5>
+                      <div className="text-gray-600">
+                        {skill.reviewIntervals && skill.reviewIntervals.length > 0 ? (
+                          <span>{skill.reviewIntervals.join(", ")} days</span>
+                        ) : (
+                          <span>1, 3, 7, 14, 30, 60 days</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Domain */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Domain</h5>
+                      <div className="text-gray-600">
+                        {skill.domain || "Not specified"}
+                        {skill.subdomain && <span className="text-gray-400"> / {skill.subdomain}</span>}
+                      </div>
+                    </div>
+
+                    {/* Threshold Concept */}
+                    {skill.isThresholdConcept && (
+                      <div className="space-y-1">
+                        <h5 className="font-medium text-gray-700">Threshold Concept</h5>
+                        <div className="text-gray-600">
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded">Yes</span>
+                          {skill.thresholdProperties?.unlocksDomains && skill.thresholdProperties.unlocksDomains.length > 0 && (
+                            <div className="mt-1 text-[10px]">
+                              Unlocks: {skill.thresholdProperties.unlocksDomains.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scaffolding Levels */}
+                  {skill.scaffoldingLevels && (
+                    <div className="mt-3 pt-3 border-t">
+                      <h5 className="font-medium text-gray-700 text-xs mb-2">Scaffolding Levels</h5>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        {(() => {
+                          try {
+                            const levels = typeof skill.scaffoldingLevels === 'string'
+                              ? JSON.parse(skill.scaffoldingLevels)
+                              : skill.scaffoldingLevels;
+                            return (
+                              <>
+                                {levels.level1 && <div><span className="font-medium">L1:</span> {levels.level1}</div>}
+                                {levels.level2 && <div><span className="font-medium">L2:</span> {levels.level2}</div>}
+                                {levels.level3 && <div><span className="font-medium">L3:</span> {levels.level3}</div>}
+                                {levels.level4 && <div><span className="font-medium">L4:</span> {levels.level4}</div>}
+                              </>
+                            );
+                          } catch {
+                            return <div className="text-gray-400">Unable to parse scaffolding data</div>;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Common Misconceptions */}
+                  {skill.commonMisconceptions && skill.commonMisconceptions.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <h5 className="font-medium text-gray-700 text-xs mb-2">Common Misconceptions</h5>
+                      <ul className="text-xs text-gray-600 list-disc list-inside space-y-0.5">
+                        {skill.commonMisconceptions.map((m, i) => (
+                          <li key={i}>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Transfer Domains */}
+                  {skill.transferDomains && skill.transferDomains.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <h5 className="font-medium text-gray-700 text-xs mb-2">Transfer Domains</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {skill.transferDomains.map((d, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">{d}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Extraction Progress Dialog */}
+      <Dialog open={isExtracting} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              Extracting Knowledge Graph
+            </DialogTitle>
+            <DialogDescription>
+              Analyzing your sources and building a comprehensive learning graph
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-6">
+            {/* Elapsed time */}
+            <div className="text-center">
+              <div className="text-3xl font-mono font-bold text-gray-900">
+                {formatElapsedTime(elapsedTime)}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{getExtractionHelpText()}</p>
+            </div>
+
+            {/* Progress bar */}
+            <Progress value={(extractionStep + 1) / extractionSteps.length * 100} className="h-2" />
+
+            {/* Steps */}
+            <div className="space-y-3">
+              {extractionSteps.map((step, index) => {
+                const StepIcon = step.icon;
+                const isComplete = index < extractionStep;
+                const isCurrent = index === extractionStep;
+                const isPending = index > extractionStep;
+
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                      isCurrent ? "bg-purple-50 border border-purple-200" :
+                      isComplete ? "bg-green-50" : "bg-gray-50"
+                    }`}
+                  >
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      isComplete ? "bg-green-500 text-white" :
+                      isCurrent ? "bg-purple-500 text-white" :
+                      "bg-gray-200 text-gray-400"
+                    }`}>
+                      {isComplete ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : isCurrent ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <StepIcon className="h-4 w-4" />
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      isComplete ? "text-green-700" :
+                      isCurrent ? "text-purple-700" :
+                      "text-gray-400"
+                    }`}>
+                      {step.label}
+                    </span>
+                    {isCurrent && (
+                      <span className="ml-auto text-xs text-purple-500 animate-pulse">
+                        In progress...
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tip */}
+            <div className="text-xs text-gray-500 text-center bg-gray-50 rounded p-2">
+              💡 Extraction uses AI to identify skills, concepts, and their relationships
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

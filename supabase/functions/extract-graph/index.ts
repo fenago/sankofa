@@ -116,17 +116,19 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY')!
-    const neo4jUri = Deno.env.get('NEO4J_URI')
-    const neo4jUser = Deno.env.get('NEO4J_USER')
-    const neo4jPassword = Deno.env.get('NEO4J_PASSWORD')
 
+    console.log(`[ExtractGraph] Supabase URL: ${supabaseUrl}`)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Update job status to processing
-    await supabase
+    const { error: processingError } = await supabase
       .from('extraction_jobs')
       .update({ status: 'processing', updated_at: new Date().toISOString() })
       .eq('id', jobId)
+
+    if (processingError) {
+      console.error(`[ExtractGraph] Failed to set processing status:`, processingError)
+    }
 
     // Fetch source content
     const { data: source } = await supabase
@@ -173,23 +175,26 @@ Deno.serve(async (req) => {
 
     console.log(`[ExtractGraph] Extracted ${extractionResult.skills.length} skills, ${extractionResult.prerequisites.length} prerequisites in ${Date.now() - startTime}ms`)
 
-    // Store in Neo4J if available
-    if (neo4jUri && neo4jUser && neo4jPassword) {
-      await storeInNeo4J(neo4jUri, neo4jUser, neo4jPassword, extractionResult, sourceId)
-      console.log(`[ExtractGraph] Stored in Neo4J`)
-    }
-
-    // Update job as completed
-    await supabase
+    // Store results in Supabase for Next.js to sync to Neo4J
+    // (Neo4J AuraDB Free doesn't support HTTP API, only Bolt protocol)
+    const { error: updateError } = await supabase
       .from('extraction_jobs')
       .update({
         status: 'completed',
         skill_count: extractionResult.skills.length,
         prerequisite_count: extractionResult.prerequisites.length,
+        result_data: extractionResult,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId)
+
+    if (updateError) {
+      console.error(`[ExtractGraph] Failed to update job in Supabase:`, updateError)
+      throw new Error(`Supabase update failed: ${updateError.message}`)
+    }
+
+    console.log(`[ExtractGraph] Stored results in Supabase, pending Neo4J sync`)
 
     console.log(`[ExtractGraph] Job ${jobId} completed in ${Date.now() - startTime}ms`)
 
@@ -242,12 +247,44 @@ async function runExtraction(
   notebookId: string,
   sourceDocumentId: string
 ) {
-  const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash'
+  // Use Gemini 3 Flash as default
+  const model = Deno.env.get('GEMINI_MODEL') || 'gemini-3-flash-preview'
 
   // Comprehensive extraction prompt with full ed psych frameworks
   const prompt = `You are an expert curriculum designer and learning scientist. Extract a comprehensive, research-grounded knowledge graph from this educational content.
 
-## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
+## CRITICAL REQUIREMENTS
+
+### 1. QUALITY OVER QUANTITY
+Extract skills based on what the content actually teaches. Each skill must be:
+- Learnable in 5-30 minutes
+- Testable with 3-5 questions
+- Atomic (cannot be broken down further without losing meaning)
+
+### 2. SOURCE-FIRST + COMMON SENSE
+- PRIMARY: Extract skills directly from the source content
+- SECONDARY: Add obvious prerequisite skills that are logically necessary even if not explicitly mentioned
+  - Example: If content teaches "Calculate standard deviation", add "Calculate variance" as prerequisite even if not in source
+  - Example: If content teaches "Interpret regression coefficients", add "Understand correlation" as prerequisite
+
+### 3. FULLY CONNECTED GRAPH - NO ORPHANS ALLOWED
+**EVERY skill must connect to at least one other skill.** There should be ZERO isolated nodes.
+
+After creating skills, review the list and for EACH skill ask:
+- "What must a learner know BEFORE this?" → Add prerequisite relationship
+- "What does this skill enable learning NEXT?" → Add as prerequisite to another skill
+
+If a skill has no connections, either:
+- Add a logical prerequisite (what foundational knowledge is needed?)
+- Connect it to a related skill with "helpful" strength
+- If truly standalone, reconsider if it belongs in this graph
+
+### 4. RELATIONSHIP TYPES
+- **required**: Cannot learn this without mastering prerequisite first
+- **recommended**: Strong benefit from prerequisite, learning is harder without it
+- **helpful**: Nice background, but can proceed without it
+
+## EDUCATIONAL PSYCHOLOGY FRAMEWORKS
 
 ### 1. Bloom's Taxonomy (Revised 2001)
 - Level 1 (Remember): Recall facts, terms, basic concepts
@@ -279,13 +316,18 @@ Identify transformative, irreversible, integrative knowledge that may be trouble
 ### 6. Mastery Learning (Bloom)
 - Mastery threshold: 0.80 standard, 0.90 for threshold concepts
 
-## SKILLS EXTRACTION
+## PREREQUISITE RELATIONSHIPS - ENSURE FULL CONNECTIVITY
 
-Extract ALL learnable skills with FULL metadata. Be GRANULAR: 5-45 minutes per skill.
+Build a CONNECTED learning graph where every skill participates in at least one relationship.
 
-## PREREQUISITES - CRITICAL
+For each skill, create prerequisites by asking:
+1. "What foundational knowledge does this require?" → required/recommended
+2. "What related skills enhance understanding?" → helpful
 
-Every non-foundational skill MUST have prerequisites. Use strength: required/recommended/helpful.
+Common patterns to ensure connectivity:
+- Definition skills → Calculation skills → Application skills → Analysis skills
+- Foundational concepts should be prerequisites for advanced concepts
+- Skills in the same domain should have at least "helpful" connections
 
 ## CONTENT TO ANALYZE
 
@@ -332,12 +374,24 @@ ${text}
   "entityRelationships": [{ "fromEntityName": "", "toEntityName": "", "type": "related_to|part_of|causes", "description": "" }]
 }
 
-## VALIDATION
+## VALIDATION CHECKLIST - REQUIRED
 
+Before returning, verify:
+✓ Each skill is atomic (5-30 min to learn)
+✓ Skills primarily come from source content
+✓ Obvious prerequisite skills are added even if not in source
 ✓ Every skill has IRT params, cognitive load, scaffolding levels
 ✓ Threshold concepts have unlocksDomains and troublesomeAspects
-✓ Every non-foundational skill has prerequisites
-✓ Graph is CONNECTED - no isolated skills`
+
+**CRITICAL - CONNECTIVITY CHECK:**
+✓ Count skills with NO prerequisites AND are not a prerequisite for anything = 0
+✓ Every skill must appear in at least one prerequisite relationship (as from OR to)
+✓ If you find orphan skills, ADD relationships to connect them
+
+**FINAL REVIEW:**
+1. List all skill names
+2. For each skill, verify it has at least one connection
+3. Add missing relationships before returning`
 
   console.log(`[ExtractGraph] Calling Gemini API with ${text.length} chars`)
   const geminiStartTime = Date.now()
@@ -374,12 +428,35 @@ ${text}
   let parsed: RawExtractionResult
   try {
     parsed = JSON.parse(responseText)
-  } catch {
+  } catch (parseError) {
+    console.log(`[ExtractGraph] Direct JSON parse failed, trying to extract from markdown...`)
+    console.log(`[ExtractGraph] Response preview: ${responseText.substring(0, 500)}...`)
+
+    // Try to extract JSON from markdown code blocks
     const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[1])
+      try {
+        parsed = JSON.parse(jsonMatch[1])
+      } catch {
+        console.error(`[ExtractGraph] Failed to parse JSON from code block`)
+        throw new Error('Failed to parse extraction response as JSON')
+      }
     } else {
-      throw new Error('Failed to parse extraction response as JSON')
+      // Try to find JSON object directly (might have extra text before/after)
+      const jsonObjectMatch = responseText.match(/\{[\s\S]*\}/)
+      if (jsonObjectMatch) {
+        try {
+          parsed = JSON.parse(jsonObjectMatch[0])
+          console.log(`[ExtractGraph] Successfully extracted JSON object from response`)
+        } catch {
+          console.error(`[ExtractGraph] Failed to parse extracted JSON object`)
+          console.error(`[ExtractGraph] Full response: ${responseText}`)
+          throw new Error('Failed to parse extraction response as JSON')
+        }
+      } else {
+        console.error(`[ExtractGraph] No JSON found in response: ${responseText}`)
+        throw new Error('Failed to parse extraction response as JSON')
+      }
     }
   }
 
@@ -475,189 +552,4 @@ ${text}
     .filter((r): r is NonNullable<typeof r> => r !== null)
 
   return { skills, prerequisites, entities, entityRelationships }
-}
-
-async function storeInNeo4J(
-  uri: string,
-  user: string,
-  password: string,
-  result: Awaited<ReturnType<typeof runExtraction>>,
-  sourceId: string
-) {
-  // Use Neo4J HTTP API since the driver doesn't work in Deno
-  const auth = btoa(`${user}:${password}`)
-  const httpUri = uri.replace('neo4j+s://', 'https://').replace('neo4j://', 'http://') + '/db/neo4j/tx/commit'
-
-  const executeQuery = async (query: string, parameters: Record<string, unknown>) => {
-    const response = await fetch(httpUri, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        statements: [{ statement: query, parameters }],
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Neo4J error: ${response.status} - ${errorText}`)
-    }
-
-    const data = await response.json()
-    if (data.errors && data.errors.length > 0) {
-      throw new Error(`Neo4J query error: ${JSON.stringify(data.errors)}`)
-    }
-
-    return data
-  }
-
-  // Delete existing skills for this source
-  await executeQuery(
-    'MATCH (s:Skill {sourceDocumentId: $sourceId}) DETACH DELETE s',
-    { sourceId }
-  )
-
-  // Delete existing entities for this source
-  await executeQuery(
-    'MATCH (e:Entity {sourceDocumentId: $sourceId}) DETACH DELETE e',
-    { sourceId }
-  )
-
-  // Store skills with full educational psychology metadata
-  for (const skill of result.skills) {
-    await executeQuery(
-      `CREATE (s:Skill {
-        id: $id,
-        name: $name,
-        description: $description,
-        notebookId: $notebookId,
-        sourceDocumentId: $sourceDocumentId,
-        bloomLevel: $bloomLevel,
-        secondaryBloomLevels: $secondaryBloomLevels,
-        difficulty: $difficulty,
-        estimatedMinutes: $estimatedMinutes,
-        irtDifficulty: $irtDifficulty,
-        irtDiscrimination: $irtDiscrimination,
-        irtGuessing: $irtGuessing,
-        isThresholdConcept: $isThresholdConcept,
-        thresholdProperties: $thresholdProperties,
-        cognitiveLoadEstimate: $cognitiveLoadEstimate,
-        elementInteractivity: $elementInteractivity,
-        chunksRequired: $chunksRequired,
-        masteryThreshold: $masteryThreshold,
-        assessmentTypes: $assessmentTypes,
-        suggestedAssessments: $suggestedAssessments,
-        reviewIntervals: $reviewIntervals,
-        scaffoldingLevels: $scaffoldingLevels,
-        commonMisconceptions: $commonMisconceptions,
-        transferDomains: $transferDomains,
-        keywords: $keywords,
-        domain: $domain,
-        subdomain: $subdomain,
-        createdAt: $createdAt,
-        updatedAt: $updatedAt
-      })`,
-      {
-        id: skill.id,
-        name: skill.name,
-        description: skill.description,
-        notebookId: skill.notebookId,
-        sourceDocumentId: skill.sourceDocumentId,
-        bloomLevel: skill.bloomLevel,
-        secondaryBloomLevels: skill.secondaryBloomLevels || [],
-        difficulty: skill.difficulty,
-        estimatedMinutes: skill.estimatedMinutes,
-        irtDifficulty: skill.irt?.difficulty ?? 0,
-        irtDiscrimination: skill.irt?.discrimination ?? 1,
-        irtGuessing: skill.irt?.guessing ?? 0.2,
-        isThresholdConcept: skill.isThresholdConcept,
-        thresholdProperties: skill.thresholdProperties ? JSON.stringify(skill.thresholdProperties) : null,
-        cognitiveLoadEstimate: skill.cognitiveLoadEstimate,
-        elementInteractivity: skill.elementInteractivity || null,
-        chunksRequired: skill.chunksRequired || null,
-        masteryThreshold: skill.masteryThreshold || 0.80,
-        assessmentTypes: skill.assessmentTypes || [],
-        suggestedAssessments: skill.suggestedAssessments ? JSON.stringify(skill.suggestedAssessments) : null,
-        reviewIntervals: skill.reviewIntervals || [1, 3, 7, 14, 30, 60],
-        scaffoldingLevels: skill.scaffoldingLevels ? JSON.stringify(skill.scaffoldingLevels) : null,
-        commonMisconceptions: skill.commonMisconceptions || [],
-        transferDomains: skill.transferDomains || [],
-        keywords: skill.keywords || [],
-        domain: skill.domain || null,
-        subdomain: skill.subdomain || null,
-        createdAt: skill.createdAt,
-        updatedAt: skill.updatedAt,
-      }
-    )
-  }
-
-  // Store prerequisites
-  for (const prereq of result.prerequisites) {
-    await executeQuery(
-      `MATCH (from:Skill {id: $fromId})
-       MATCH (to:Skill {id: $toId})
-       CREATE (from)-[:PREREQUISITE_OF {
-         strength: $strength,
-         confidenceScore: $confidenceScore,
-         reasoning: $reasoning,
-         inferenceMethod: $inferenceMethod
-       }]->(to)`,
-      {
-        fromId: prereq.fromSkillId,
-        toId: prereq.toSkillId,
-        strength: prereq.strength,
-        confidenceScore: prereq.confidenceScore,
-        reasoning: prereq.reasoning || '',
-        inferenceMethod: prereq.inferenceMethod,
-      }
-    )
-  }
-
-  // Store entities
-  for (const entity of result.entities) {
-    await executeQuery(
-      `CREATE (e:Entity {
-        id: $id,
-        name: $name,
-        type: $type,
-        description: $description,
-        notebookId: $notebookId,
-        sourceDocumentId: $sourceDocumentId,
-        createdAt: $createdAt
-      })`,
-      {
-        id: entity.id,
-        name: entity.name,
-        type: entity.type,
-        description: entity.description || '',
-        notebookId: entity.notebookId,
-        sourceDocumentId: entity.sourceDocumentId,
-        createdAt: entity.createdAt,
-      }
-    )
-  }
-
-  // Store entity relationships
-  for (const rel of result.entityRelationships) {
-    await executeQuery(
-      `MATCH (from:Entity {id: $fromId})
-       MATCH (to:Entity {id: $toId})
-       CREATE (from)-[:RELATES_TO {
-         type: $type,
-         description: $description,
-         confidence: $confidence
-       }]->(to)`,
-      {
-        fromId: rel.fromEntityId,
-        toId: rel.toEntityId,
-        type: rel.type,
-        description: rel.description || '',
-        confidence: rel.confidence,
-      }
-    )
-  }
-
-  console.log(`[ExtractGraph] Stored ${result.skills.length} skills, ${result.prerequisites.length} prerequisites in Neo4J`)
 }

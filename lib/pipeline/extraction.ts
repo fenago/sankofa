@@ -60,9 +60,38 @@ export async function extractFromText(
 
   const prompt = `You are an expert curriculum designer and learning scientist. Extract a comprehensive, research-grounded knowledge graph from this educational content.
 
-## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
+## CRITICAL REQUIREMENTS
 
-You must apply these frameworks when analyzing each skill:
+### 1. QUALITY OVER QUANTITY
+Extract skills based on what the content actually teaches. Each skill must be:
+- Learnable in 5-30 minutes
+- Testable with 3-5 questions
+- Atomic (cannot be broken down further without losing meaning)
+
+### 2. SOURCE-FIRST + COMMON SENSE
+- PRIMARY: Extract skills directly from the source content
+- SECONDARY: Add obvious prerequisite skills that are logically necessary even if not explicitly mentioned
+  - Example: If content teaches "Calculate standard deviation", add "Calculate variance" as prerequisite even if not in source
+  - Example: If content teaches "Interpret regression coefficients", add "Understand correlation" as prerequisite
+
+### 3. FULLY CONNECTED GRAPH - NO ORPHANS ALLOWED
+**EVERY skill must connect to at least one other skill.** There should be ZERO isolated nodes.
+
+After creating skills, review the list and for EACH skill ask:
+- "What must a learner know BEFORE this?" → Add prerequisite relationship
+- "What does this skill enable learning NEXT?" → Add as prerequisite to another skill
+
+If a skill has no connections, either:
+- Add a logical prerequisite (what foundational knowledge is needed?)
+- Connect it to a related skill with "helpful" strength
+- If truly standalone, reconsider if it belongs in this graph
+
+### 4. RELATIONSHIP TYPES
+- **required**: Cannot learn this without mastering prerequisite first
+- **recommended**: Strong benefit from prerequisite, learning is harder without it
+- **helpful**: Nice background, but can proceed without it
+
+## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
 
 ### 1. Bloom's Taxonomy (Revised 2001)
 - Level 1 (Remember): Recall facts, terms, basic concepts
@@ -73,55 +102,39 @@ You must apply these frameworks when analyzing each skill:
 - Level 6 (Create): Produce new work, design solutions
 
 ### 2. Item Response Theory (IRT) - 3PL Model
-For assessment calibration:
 - Difficulty (b): -3 (very easy) to +3 (very hard), 0 = average
-- Discrimination (a): 0.5 (poor) to 2.5 (excellent) - how well it differentiates ability
-- Guessing (c): 0 to 0.5 - probability of correct guess (higher for MCQ, lower for free response)
+- Discrimination (a): 0.5 (poor) to 2.5 (excellent)
+- Guessing (c): 0 to 0.5 - probability of correct guess
 
 ### 3. Threshold Concepts (Meyer & Land)
-Identify transformative knowledge that:
-- Is TRANSFORMATIVE (changes how learner thinks)
-- Is IRREVERSIBLE (can't "unsee" it once understood)
-- Is INTEGRATIVE (connects previously separate ideas)
-- May be TROUBLESOME (counterintuitive, alien)
+Identify transformative, irreversible, integrative knowledge that may be troublesome.
 
 ### 4. Cognitive Load Theory (Sweller)
-Estimate cognitive demands:
 - Cognitive load: low/medium/high
-- Chunks required: working memory slots needed (2-7)
-- Element interactivity: how many elements must be processed simultaneously
+- Chunks required: working memory slots (2-7)
+- Element interactivity: low/medium/high
 
 ### 5. Instructional Scaffolding (Vygotsky/Wood)
-Define 4 levels of support that fade as mastery increases:
-- Level 1: Full worked examples with explanation
-- Level 2: Partial solutions with gaps to fill
-- Level 3: Hints available on request
+- Level 1: Full worked examples
+- Level 2: Partial solutions
+- Level 3: Hints on request
 - Level 4: Independent practice
 
 ### 6. Mastery Learning (Bloom)
-- Mastery threshold: typically 0.80, use 0.90 for threshold concepts
-- Assessment types: formative, summative, diagnostic, performance, peer
+- Mastery threshold: 0.80 standard, 0.90 for threshold concepts
 
-### 7. Spaced Repetition (Ebbinghaus)
-Suggest review intervals based on forgetting curve: [1, 3, 7, 14, 30, 60] days
+## PREREQUISITE RELATIONSHIPS - ENSURE FULL CONNECTIVITY
 
-## SKILLS EXTRACTION
+Build a CONNECTED learning graph where every skill participates in at least one relationship.
 
-Extract ALL learnable skills with FULL metadata:
-- Be GRANULAR: each skill = one coherent learning objective (5-45 minutes)
-- Include implicit foundational skills learners would need
-- Identify the DOMAIN and SUBDOMAIN for categorization
+For each skill, create prerequisites by asking:
+1. "What foundational knowledge does this require?" → required/recommended
+2. "What related skills enhance understanding?" → helpful
 
-## PREREQUISITES - CRITICAL FOR GRAPH CONNECTIVITY
-
-The prerequisite graph shows the LEARNING SEQUENCE. Without it, the graph is useless.
-
-For EVERY skill, identify what must be learned first:
-- Explicit dependencies from the content
-- Implicit dependencies a teacher would recognize
-- Use strength levels: "required" (must have), "recommended" (should have), "helpful" (nice to have)
-
-Every skill except true entry-level fundamentals MUST have prerequisites.
+Common patterns to ensure connectivity:
+- Definition skills → Calculation skills → Application skills → Analysis skills
+- Foundational concepts should be prerequisites for advanced concepts
+- Skills in the same domain should have at least "helpful" connections
 ${existingContext}
 
 ## CONTENT TO ANALYZE
@@ -197,16 +210,24 @@ ${text}
   "existingSkillReferences": []
 }
 
-## VALIDATION CHECKLIST
+## VALIDATION CHECKLIST - REQUIRED
 
-Before responding, ensure:
-✓ Every skill has complete metadata (IRT params, cognitive load, scaffolding)
-✓ Threshold concepts are identified with unlocksDomains and troublesomeAspects
-✓ Every non-foundational skill has at least one prerequisite
-✓ Prerequisites use appropriate strength levels with reasoning
-✓ The graph is CONNECTED - no isolated skills
-✓ Skills are granular (5-45 min each) with clear learning objectives
-✓ Domain and subdomain are specified for categorization`
+Before returning, verify:
+✓ Each skill is atomic (5-30 min to learn)
+✓ Skills primarily come from source content
+✓ Obvious prerequisite skills are added even if not in source
+✓ Every skill has IRT params, cognitive load, scaffolding levels
+✓ Threshold concepts have unlocksDomains and troublesomeAspects
+
+**CRITICAL - CONNECTIVITY CHECK:**
+✓ Count skills with NO prerequisites AND are not a prerequisite for anything = 0
+✓ Every skill must appear in at least one prerequisite relationship (as from OR to)
+✓ If you find orphan skills, ADD relationships to connect them
+
+**FINAL REVIEW:**
+1. List all skill names
+2. For each skill, verify it has at least one connection
+3. Add missing relationships before returning`
 
   let response
   try {
@@ -464,38 +485,33 @@ async function extractFromTextDirect(
     ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
     : ''
 
-  const prompt = `You are an expert curriculum designer. Analyze this educational content and extract a knowledge graph that helps learners understand the progression of skills.
+  const prompt = `You are an expert curriculum designer. Extract a CONNECTED knowledge graph from this educational content.
 
-Your goal is to create a USEFUL and ACCURATE knowledge graph for learning.
+## CRITICAL REQUIREMENTS
 
-Extract:
-1. **Skills/Concepts**: The learnable skills, concepts, techniques, and procedures
-   - What does a learner need to know or be able to do?
-   - Include both knowledge (understanding) and abilities (application)
-   - Use your expertise: if an obvious foundational skill is needed but not stated, include it
+### 1. QUALITY OVER QUANTITY
+- Extract skills based on what the content actually teaches
+- Each skill should be learnable in 5-30 minutes, testable with 3-5 questions
 
-2. **Prerequisites**: The dependency relationships between skills
-   - Which skills must be learned before others?
-   - Include OBVIOUS prerequisites even if not explicitly stated
-   - Use pedagogical judgment - what would a good teacher identify as prerequisites?
-   - A truly foundational skill doesn't need prerequisites
+### 2. SOURCE-FIRST + COMMON SENSE
+- PRIMARY: Skills from the source content
+- SECONDARY: Add obvious prerequisite skills that are logically necessary
 
-3. **Entities**: Key terms, people, formulas, theorems mentioned
-
-4. **Entity Relationships**: How entities relate to each other
+### 3. FULLY CONNECTED - NO ORPHANS
+**EVERY skill must connect to at least one other skill.** Zero isolated nodes.
 ${existingContext}
 
 TEXT TO ANALYZE:
 ${text}
 
-Respond with valid JSON:
+Respond with JSON:
 {
   "skills": [
     {
-      "name": "string (unique, descriptive name)",
+      "name": "string (unique, descriptive)",
       "description": "string (1-2 sentences)",
       "bloomLevel": 1-6,
-      "estimatedMinutes": number,
+      "estimatedMinutes": 5-30,
       "difficulty": 1-10,
       "isThresholdConcept": boolean,
       "keywords": ["relevant keywords"]
@@ -503,16 +519,16 @@ Respond with valid JSON:
   ],
   "prerequisites": [
     {
-      "fromSkillName": "prerequisite skill (learned FIRST)",
-      "toSkillName": "dependent skill (requires the prerequisite)",
+      "fromSkillName": "prerequisite (learned FIRST)",
+      "toSkillName": "dependent skill",
       "strength": "required" | "recommended" | "helpful",
-      "reasoning": "why this relationship exists"
+      "reasoning": "why this dependency"
     }
   ],
   "entities": [
     {
       "name": "entity name",
-      "type": "concept" | "person" | "event" | "place" | "term" | "formula" | "other",
+      "type": "concept" | "person" | "term" | "formula" | "other",
       "description": "brief description"
     }
   ],
@@ -520,18 +536,16 @@ Respond with valid JSON:
     {
       "fromEntityName": "source entity",
       "toEntityName": "target entity",
-      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of" | "opposite_of"
+      "type": "related_to" | "part_of" | "causes" | "precedes" | "example_of"
     }
   ],
   "existingSkillReferences": ["names of existing skills referenced"]
 }
 
-GUIDELINES:
-- Create a USEFUL learning graph, not just a literal extraction
-- Include obvious prerequisites even if not explicitly mentioned
-- Use your expertise - add foundational skills that learners would need
-- Be thorough - analyze the entire content
-- The graph should help learners understand skill progression`
+**VALIDATION - Before returning:**
+✓ Every skill appears in at least one prerequisite (as from OR to)
+✓ If you find orphan skills, ADD relationships to connect them
+✓ Include obvious prerequisites even if not in the source text`
 
   let response
   try {
@@ -680,33 +694,41 @@ async function inferPrerequisitesFromSkills(
     bloomLevel: s.bloomLevel,
   }))
 
-  const prompt = `You are an expert curriculum designer. Given these ${skills.length} skills extracted from educational content, identify PREREQUISITE relationships between them.
+  const prompt = `You are an expert curriculum designer. Given these ${skills.length} skills extracted from educational content, identify PREREQUISITE relationships to create a FULLY CONNECTED graph.
 
-A prerequisite means: Skill A must be learned BEFORE Skill B.
+**CRITICAL: NO ORPHAN SKILLS. Every skill must have at least one connection.**
 
 SKILLS:
 ${skillList.map((s, i) => `${i + 1}. [${s.id}] "${s.name}" (Bloom L${s.bloomLevel})`).join('\n')}
 
-Identify ALL prerequisite relationships. Be thorough - if one skill builds on concepts from another, that's a prerequisite. Consider:
-- Foundational skills needed before advanced ones
-- Conceptual dependencies (must understand X to learn Y)
-- Bloom's level progressions (Remember/Understand before Apply/Analyze)
-- Logical sequencing (data collection before analysis, theory before practice)
+For EACH skill, ensure it connects to at least one other skill by asking:
+- "What must be learned BEFORE this?" → Add prerequisite
+- "What does this enable learning?" → This skill is a prerequisite for something else
+
+Relationship types:
+- **required**: Must master prerequisite first
+- **recommended**: Learning is harder without it
+- **helpful**: Nice background
+
+Consider:
+- Foundational skills → Advanced skills
+- Definition → Calculation → Application → Analysis
+- Bloom's level progressions
 
 Respond with JSON:
 {
   "prerequisites": [
     {
-      "fromSkillId": "skill_id (the prerequisite - learned FIRST)",
-      "toSkillId": "skill_id (the dependent - requires the prerequisite)",
+      "fromSkillId": "skill_id (prerequisite - learned FIRST)",
+      "toSkillId": "skill_id (dependent - needs the prerequisite)",
       "strength": "required" | "recommended" | "helpful",
-      "reasoning": "brief reason for this relationship"
+      "reasoning": "brief reason"
     }
   ]
 }
 
-IMPORTANT: Use the EXACT skill IDs provided in brackets [skill_xxx].
-Generate at least ${Math.min(skills.length * 2, 50)} relationships if possible.`
+**Use EXACT skill IDs in brackets [skill_xxx].**
+**Ensure every skill appears in at least one relationship (as from OR to).**`
 
   try {
     const startTime = Date.now()
@@ -1097,10 +1119,12 @@ export async function extractFromTextFast(
 
   console.log(`[FastExtraction] Processing ${processedText.length} chars (original: ${text.length})`)
 
-  const prompt = `Extract skills and prerequisites from this educational content.
+  const prompt = `Extract skills and prerequisites from this educational content. Create a CONNECTED graph - no orphan skills.
 
-For each skill, provide: name, description (1 sentence), bloomLevel (1-6), difficulty (1-10).
-Identify prerequisite relationships between skills.
+## REQUIREMENTS
+1. Skills from source content + obvious prerequisites
+2. Every skill must connect to at least one other skill
+3. Include obvious prerequisite skills even if not explicitly mentioned
 
 TEXT:
 ${processedText}
@@ -1108,8 +1132,10 @@ ${processedText}
 Respond with JSON:
 {
   "skills": [{"name": "string", "description": "string", "bloomLevel": 1-6, "difficulty": 1-10, "isThresholdConcept": boolean}],
-  "prerequisites": [{"fromSkillName": "prerequisite skill", "toSkillName": "dependent skill", "strength": "required"|"recommended"|"helpful"}]
-}`
+  "prerequisites": [{"fromSkillName": "prerequisite (learned FIRST)", "toSkillName": "dependent skill", "strength": "required"|"recommended"|"helpful"}]
+}
+
+**VALIDATION: Every skill must appear in at least one prerequisite (as from OR to).**`
 
   const startTime = Date.now()
   let response

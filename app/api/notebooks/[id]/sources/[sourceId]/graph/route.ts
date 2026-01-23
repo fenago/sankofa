@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable } from '@/lib/graph/neo4j'
-import { getSkillCountBySource, deleteSourceSkills } from '@/lib/graph/store'
+import { getSkillCountBySource, deleteSourceSkills, storeGraphExtraction } from '@/lib/graph/store'
+import type { GraphExtractionResult } from '@/lib/types/graph'
 
 interface RouteParams {
   params: Promise<{ id: string; sourceId: string }>
@@ -81,11 +82,31 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Check for recent completed/failed jobs
     const { data: recentJob } = await adminSupabase
       .from('extraction_jobs')
-      .select('id, status, skill_count, error_message, completed_at')
+      .select('id, status, skill_count, error_message, completed_at, result_data')
       .eq('source_id', sourceId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
+
+    // If job is completed and has result_data, sync to Neo4J
+    if (recentJob?.status === 'completed' && recentJob.result_data) {
+      try {
+        console.log(`[Graph] Syncing extraction results to Neo4J for source ${sourceId}`)
+        const extractionResult = recentJob.result_data as GraphExtractionResult
+        await storeGraphExtraction(extractionResult)
+
+        // Clear result_data after successful sync
+        await adminSupabase
+          .from('extraction_jobs')
+          .update({ result_data: null })
+          .eq('id', recentJob.id)
+
+        console.log(`[Graph] Synced ${extractionResult.skills.length} skills to Neo4J`)
+      } catch (syncError) {
+        console.error('[Graph] Failed to sync to Neo4J:', syncError)
+        // Don't fail the request - the data is in Supabase, we can retry later
+      }
+    }
 
     // Get skill count for this source from Neo4J
     const skillCount = await getSkillCountBySource(sourceId)

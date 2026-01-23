@@ -51,10 +51,19 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Get entities
     const entities = await getEntitiesByNotebook(notebookId)
 
+    // Transform prerequisites to match frontend format
+    // API stores: { fromSkillId, toSkillId, strength }
+    // Frontend expects: { source, target, type }
+    const prerequisites = skillGraph.prerequisites.map(p => ({
+      source: p.fromSkillId,
+      target: p.toSkillId,
+      type: p.strength || 'recommended',
+    }))
+
     return NextResponse.json({
       available: true,
       skills: skillGraph.skills,
-      prerequisites: skillGraph.prerequisites,
+      prerequisites,
       entities,
     })
   } catch (error) {
