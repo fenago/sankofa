@@ -2,13 +2,13 @@
 
 ## AI-Powered Personalized Learning Through Knowledge Graph Intelligence
 
-**January 2025** | Version 1.1
+**January 2026** | Version 1.1
 
 ---
 
 ### Authors
 
-**Ernesto Lee**
+**Dr. Ernesto Lee**
 Founder & Principal Architect
 
 ---
@@ -1117,9 +1117,9 @@ Inverse Profiling with LearnGraph is not merely a tool—it is **infrastructure 
 ---
 
 **Document Version**: 1.1
-**Last Updated**: January 2025
+**Last Updated**: January 2026
 **License**: This whitepaper is released under Creative Commons Attribution 4.0 International (CC BY 4.0)
 
 ### Version History
-- **1.1 (January 2025)**: Added Part 7 covering 8 modern frameworks (2020-2025) under consideration for future integration. Updated framework count to 21 implemented + 8 TBD.
-- **1.0 (December 2024)**: Initial release documenting 21 implemented educational psychology frameworks.
+- **1.1 (January 2026)**: Added Part 7 covering 8 modern frameworks (2020-2025) under consideration for future integration. Updated framework count to 21 implemented + 8 TBD.
+- **1.0 (December 2025)**: Initial release documenting 21 implemented educational psychology frameworks.

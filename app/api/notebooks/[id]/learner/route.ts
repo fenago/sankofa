@@ -83,7 +83,18 @@ export async function GET(request: Request, { params }: RouteParams) {
       case 'zpd': {
         // Get Zone of Proximal Development skills using actual mastered state
         const masteredIds = await getMasteredSkillIds(learnerId, notebookId)
-        const zpdSkills = await getZPDSkills(notebookId, masteredIds)
+        const zpdSkillsRaw = await getZPDSkills(notebookId, masteredIds)
+        // Transform to flat structure expected by frontend
+        const zpdSkills = zpdSkillsRaw.map((item) => ({
+          id: item.skill.id,
+          name: item.skill.name,
+          bloomLevel: item.skill.bloomLevel,
+          difficulty: item.skill.difficulty,
+          readinessScore: item.readinessScore,
+          reason: item.prerequisitesPending.length > 0
+            ? `Ready after mastering: ${item.prerequisitesPending.length} prerequisite(s)`
+            : 'All prerequisites mastered',
+        }))
         return NextResponse.json({
           available: true,
           zpdSkills,

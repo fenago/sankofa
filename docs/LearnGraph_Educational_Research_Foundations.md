@@ -1,6 +1,6 @@
 # LearnGraph: Educational Research Foundations & Learning Impact Measurement
 
-**Updated: January 2025** | Version 1.1
+**Updated: January 2026** | Version 1.1
 
 ## Document Purpose
 
@@ -2047,8 +2047,8 @@ The following 8 frameworks represent cutting-edge research being evaluated for f
 ---
 
 **Document Version**: 1.1
-**Last Updated**: January 2025
+**Last Updated**: January 2026
 
 ### Version History
-- **1.1 (January 2025)**: Added Part 4 covering 8 modern frameworks (2020-2025) under consideration.
-- **1.0 (December 2024)**: Initial comprehensive documentation of research foundations.
+- **1.1 (January 2026)**: Added Part 4 covering 8 modern frameworks (2020-2025) under consideration.
+- **1.0 (December 2025)**: Initial comprehensive documentation of research foundations.

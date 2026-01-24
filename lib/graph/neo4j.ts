@@ -1,4 +1,7 @@
-import neo4j, { Driver, Session, type SessionConfig, type ManagedTransaction } from 'neo4j-driver'
+import neo4j, { Driver, Session, type SessionConfig, type ManagedTransaction, Integer } from 'neo4j-driver'
+
+// Export neo4j.int for proper integer handling in queries
+export const toNeo4JInt = (value: number): Integer => neo4j.int(Math.floor(value))
 
 // Singleton driver instance
 let driver: Driver | null = null

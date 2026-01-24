@@ -7,7 +7,7 @@
  * - Scaffolding level progression
  */
 
-import { runQuery, runWriteTransaction } from './neo4j'
+import { runQuery, runWriteTransaction, toNeo4JInt } from './neo4j'
 import type { LearnerSkillState, SkillNode } from '@/lib/types/graph'
 import type { InverseProfile } from '@/lib/types/interactions'
 
@@ -476,7 +476,7 @@ export async function getSkillsDueForReview(
     ORDER BY ls.srNextReviewAt ASC
     LIMIT $limit
     `,
-    { learnerId, notebookId, now, limit }
+    { learnerId, notebookId, now, limit: toNeo4JInt(limit) }
   )
 
   return result.map(r => {

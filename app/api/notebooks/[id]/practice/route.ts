@@ -32,6 +32,15 @@ import {
 } from '@/lib/practice/feedback-generator'
 import type { SkillNode, LearnerSkillState, ZPDSkill } from '@/lib/types/graph'
 
+// Helper to convert BigInt values to numbers for JSON serialization
+function serializeForJson<T>(obj: T): T {
+  return JSON.parse(
+    JSON.stringify(obj, (_, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    )
+  )
+}
+
 interface RouteParams {
   params: Promise<{ id: string }>
 }
@@ -287,6 +296,7 @@ export async function GET(request: Request, { params }: RouteParams) {
  * - hintsUsed: number
  * - confidenceRating?: number (1-5)
  * - sessionId?: string
+ * - question?: object (full question data from client)
  */
 export async function POST(request: Request, { params }: RouteParams) {
   try {
@@ -318,6 +328,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       hintsUsed = 0,
       confidenceRating,
       sessionId,
+      question: questionData,
     } = body
 
     if (!questionId || typeof userAnswer !== 'string') {
@@ -326,35 +337,55 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 400 })
     }
 
-    // Get the question from cache
-    // Note: Type assertion needed until practice_questions table is created
-    const { data: cachedQuestion } = await (supabase as any)
-      .from('practice_questions')
-      .select('*')
-      .eq('id', questionId)
-      .single()
+    let question: GeneratedQuestion
 
-    if (!cachedQuestion) {
-      return NextResponse.json({
-        error: 'Question not found',
-      }, { status: 404 })
-    }
+    // First try to use question data provided by client (preferred for now until DB table exists)
+    if (questionData) {
+      question = {
+        id: questionData.id,
+        skillId: questionData.skillId,
+        type: questionData.type,
+        question: questionData.question,
+        options: questionData.options,
+        correctAnswer: questionData.correctAnswer,
+        explanation: questionData.explanation,
+        hints: questionData.hints || [],
+        difficulty: questionData.difficulty || 0.5,
+        bloomLevel: questionData.bloomLevel || 1,
+        scaffoldLevel: questionData.scaffoldLevel || 2,
+        workedExample: questionData.workedExample,
+        partialSolution: questionData.partialSolution,
+      }
+    } else {
+      // Fall back to database lookup (for when practice_questions table exists)
+      const { data: cachedQuestion } = await (supabase as any)
+        .from('practice_questions')
+        .select('*')
+        .eq('id', questionId)
+        .single()
 
-    // Reconstruct the GeneratedQuestion
-    const question: GeneratedQuestion = {
-      id: cachedQuestion.id,
-      skillId: cachedQuestion.skill_id,
-      type: cachedQuestion.question_type,
-      question: cachedQuestion.question_data.question,
-      options: cachedQuestion.question_data.options,
-      correctAnswer: cachedQuestion.question_data.correctAnswer,
-      explanation: cachedQuestion.question_data.explanation,
-      hints: cachedQuestion.question_data.hints,
-      difficulty: cachedQuestion.difficulty,
-      bloomLevel: cachedQuestion.bloom_level,
-      scaffoldLevel: cachedQuestion.scaffold_level,
-      workedExample: cachedQuestion.question_data.workedExample,
-      partialSolution: cachedQuestion.question_data.partialSolution,
+      if (!cachedQuestion) {
+        return NextResponse.json({
+          error: 'Question not found. Please provide question data or ensure questions are cached.',
+        }, { status: 404 })
+      }
+
+      // Reconstruct the GeneratedQuestion from cached data
+      question = {
+        id: cachedQuestion.id,
+        skillId: cachedQuestion.skill_id,
+        type: cachedQuestion.question_type,
+        question: cachedQuestion.question_data.question,
+        options: cachedQuestion.question_data.options,
+        correctAnswer: cachedQuestion.question_data.correctAnswer,
+        explanation: cachedQuestion.question_data.explanation,
+        hints: cachedQuestion.question_data.hints,
+        difficulty: cachedQuestion.difficulty,
+        bloomLevel: cachedQuestion.bloom_level,
+        scaffoldLevel: cachedQuestion.scaffold_level,
+        workedExample: cachedQuestion.question_data.workedExample,
+        partialSolution: cachedQuestion.question_data.partialSolution,
+      }
     }
 
     // Evaluate the answer
@@ -439,7 +470,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Get updated progress
     const progress = await getLearnerProgress(learnerId, notebookId)
 
-    return NextResponse.json({
+    // Serialize to handle any BigInt values from Neo4J
+    return NextResponse.json(serializeForJson({
       available: true,
       isCorrect: evaluation.isCorrect,
       score: evaluation.score,
@@ -457,7 +489,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       } : null,
       progress,
       workedExample: !evaluation.isCorrect ? question.workedExample : undefined,
-    })
+    }))
   } catch (error) {
     console.error('Error submitting practice answer:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

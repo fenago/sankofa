@@ -2,7 +2,7 @@
  * Neo4J graph store operations for GraphRAG
  */
 
-import { runQuery, runWriteTransaction } from './neo4j'
+import { runQuery, runWriteTransaction, toNeo4JInt } from './neo4j'
 import type {
   SkillNode,
   EntityNode,
@@ -616,7 +616,7 @@ export async function searchSkills(
     RETURN s
     LIMIT $limit
     `,
-    { notebookId, query, limit }
+    { notebookId, query, limit: toNeo4JInt(limit) }
   )
 
   return result.map(r => extractProperties(r.s))

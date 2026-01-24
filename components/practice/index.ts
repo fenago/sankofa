@@ -8,3 +8,12 @@ export { ConfidenceRating } from './ConfidenceRating'
 export { FeedbackPanel } from './FeedbackPanel'
 export { WorkedExample } from './WorkedExample'
 export { SessionSummary } from './SessionSummary'
+
+// Desirable Difficulties
+export { InterleavedModeToggle } from './InterleavedModeToggle'
+export { DesirableDifficultyIndicator } from './DesirableDifficultyIndicator'
+
+// Productive Failure
+export { ExploreFirstMode } from './ExploreFirstMode'
+export { ConsolidationView } from './ConsolidationView'
+export { AttemptTimeline } from './AttemptTimeline'

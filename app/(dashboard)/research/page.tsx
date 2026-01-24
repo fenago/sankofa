@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, Brain, FlaskConical, Lightbulb, Target, Clock, Users, BarChart3, GitBranch, CheckCircle2, AlertTriangle, ExternalLink, FileText, GraduationCap, Layers, Shield, TrendingUp, Zap, Eye, Hand, MessageCircle, Coffee, PenTool } from 'lucide-react'
+import { ArrowLeft, BookOpen, Brain, FlaskConical, Lightbulb, Target, Clock, Users, BarChart3, GitBranch, CheckCircle2, AlertTriangle, ExternalLink, FileText, GraduationCap, Layers, Shield, TrendingUp, Zap, Eye, Hand, MessageCircle, Coffee, PenTool, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -264,6 +264,8 @@ const whitepapers = [
     slug: "inverse-profiling-whitepaper",
     icon: Brain,
     pages: "~50 pages",
+    readTime: "45 min",
+    color: "purple" as const,
   },
   {
     title: "Competitive Positioning",
@@ -272,6 +274,8 @@ const whitepapers = [
     slug: "competitive-positioning",
     icon: TrendingUp,
     pages: "~30 pages",
+    readTime: "25 min",
+    color: "blue" as const,
   },
   {
     title: "Educational Research Foundations",
@@ -280,6 +284,8 @@ const whitepapers = [
     slug: "educational-research-foundations",
     icon: BookOpen,
     pages: "~100 pages",
+    readTime: "90 min",
+    color: "green" as const,
   },
   {
     title: "Theory Overview",
@@ -288,6 +294,8 @@ const whitepapers = [
     slug: "theory-overview",
     icon: FileText,
     pages: "~15 pages",
+    readTime: "15 min",
+    color: "orange" as const,
   },
 ]
 
@@ -380,23 +388,33 @@ export default function ResearchPage() {
             <FileText className="h-5 w-5 text-purple-600" />
             Research Documentation
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-6">
             {whitepapers.map((paper) => {
               const Icon = paper.icon
+              const colorStyles = {
+                purple: { bg: 'bg-purple-100', text: 'text-purple-700', gradient: 'from-purple-500 to-purple-700', border: 'hover:border-purple-300' },
+                blue: { bg: 'bg-blue-100', text: 'text-blue-700', gradient: 'from-blue-500 to-blue-700', border: 'hover:border-blue-300' },
+                green: { bg: 'bg-green-100', text: 'text-green-700', gradient: 'from-green-500 to-green-700', border: 'hover:border-green-300' },
+                orange: { bg: 'bg-orange-100', text: 'text-orange-700', gradient: 'from-orange-500 to-orange-700', border: 'hover:border-orange-300' },
+              }[paper.color]
               return (
                 <Link key={paper.title} href={`/research/docs/${paper.slug}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer hover:border-purple-300 h-full">
-                    <CardContent className="pt-4">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg shrink-0">
-                          <Icon className="h-5 w-5 text-purple-700" />
+                  <Card className={`group hover:shadow-lg transition-all duration-300 cursor-pointer ${colorStyles.border} h-full overflow-hidden`}>
+                    <div className={`h-2 bg-gradient-to-r ${colorStyles.gradient}`} />
+                    <CardContent className="pt-5">
+                      <div className="flex items-start gap-4">
+                        <div className={`p-3 ${colorStyles.bg} rounded-xl shrink-0 group-hover:scale-110 transition-transform`}>
+                          <Icon className={`h-6 w-6 ${colorStyles.text}`} />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium">{paper.title}</h3>
-                          <p className="text-sm text-gray-500 mt-1">{paper.description}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-xs">{paper.pages}</Badge>
-                            <span className="text-xs text-gray-400">{paper.path}</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">{paper.title}</h3>
+                          <p className="text-sm text-gray-500 mt-1.5 line-clamp-2">{paper.description}</p>
+                          <div className="flex items-center gap-3 mt-3">
+                            <Badge variant="outline" className="text-xs font-medium">{paper.pages}</Badge>
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              <Clock className="h-3 w-3" />
+                              {paper.readTime}
+                            </div>
                           </div>
                         </div>
                       </div>

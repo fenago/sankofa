@@ -204,6 +204,8 @@ export function usePractice(notebookId: string, options: PracticeOptions = {}) {
             hintsUsed: currentHintsUsed,
             confidenceRating,
             sessionId,
+            // Include full question data so server can evaluate without DB lookup
+            question: currentQuestion,
           }),
         })
 

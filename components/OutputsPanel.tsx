@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2, BookOpen, GraduationCap, Users, ChevronRight, FlaskConical } from "lucide-react";
+import { Play, Pause, Download, Loader2, ChevronDown, ChevronUp, Sparkles, Network, Maximize2, BookOpen, GraduationCap, Users, ChevronRight, FlaskConical, Brain, Target, Route, ClipboardCheck, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -256,12 +256,87 @@ export function OutputsPanel({
 
   return (
     <div className="flex flex-col h-full gap-6 p-4">
+      {/* Start Learning - Core learner features */}
+      {notebookId && (
+        <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="h-5 w-5 text-green-600" />
+            <h3 className="text-lg font-semibold text-black">Start Learning</h3>
+          </div>
+          <p className="text-xs text-gray-600 mb-4">
+            Practice skills, track progress, and master the content
+          </p>
+          <div className="space-y-2">
+            <Link
+              href={`/notebooks/${notebookId}/practice`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                  <Target className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">Practice</div>
+                  <div className="text-xs text-gray-500">Adaptive questions in your ZPD</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-green-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/path`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                  <Route className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">Learning Path</div>
+                  <div className="text-xs text-gray-500">Visual skill map & progress</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/assess`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                  <ClipboardCheck className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">Assessments</div>
+                  <div className="text-xs text-gray-500">Test your knowledge formally</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-500" />
+            </Link>
+            <Link
+              href={`/notebooks/${notebookId}/profile`}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-pink-300 hover:bg-pink-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-pink-100 rounded-lg group-hover:bg-pink-200 transition-colors">
+                  <Brain className="h-4 w-4 text-pink-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm text-gray-900">My Profile</div>
+                  <div className="text-xs text-gray-500">12 frameworks tracking your progress</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-pink-500" />
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* LearnGraph Features - only shown when in a notebook context */}
       {notebookId && (
         <section className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="h-5 w-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-black">LearnGraph Features</h3>
+            <h3 className="text-lg font-semibold text-black">Study Tools</h3>
           </div>
           <p className="text-xs text-gray-600 mb-4">
             AI-powered educational tools grounded in learning science research
