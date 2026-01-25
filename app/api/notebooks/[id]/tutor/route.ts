@@ -1059,7 +1059,7 @@ async function handleInverseSocraticExchange(
       ],
       config: {
         temperature: 0.8,
-        maxOutputTokens: 300,
+        maxOutputTokens: 1024,
       },
     })
 
@@ -1315,7 +1315,7 @@ Response:`
       ],
       config: {
         temperature: 0.7,
-        maxOutputTokens: 500,
+        maxOutputTokens: 2048,
       },
     })
 
