@@ -761,7 +761,7 @@ async function handleSocraticExchange(
       ],
       config: {
         temperature: 0.7,
-        maxOutputTokens: 256,
+        maxOutputTokens: 4096,
       },
     })
     aiNextQuestion = result.text?.trim() || exchangeResult.nextQuestion
@@ -1059,7 +1059,7 @@ async function handleInverseSocraticExchange(
       ],
       config: {
         temperature: 0.8,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
       },
     })
 
@@ -1315,7 +1315,7 @@ Response:`
       ],
       config: {
         temperature: 0.7,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
       },
     })
 
