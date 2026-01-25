@@ -33,7 +33,12 @@ export type InteractionEventType =
   | 'session_started'
   | 'session_ended'
   | 'session_paused'
-  | 'session_resumed';
+  | 'session_resumed'
+  // Socratic Mode Events
+  | 'socratic_dialogue_started'
+  | 'socratic_exchange'
+  | 'socratic_discovery'
+  | 'socratic_dialogue_completed';
 
 // ============================================================================
 // EVENT PAYLOADS (specific data for each event type)
@@ -163,6 +168,76 @@ export interface SessionResumedPayload {
   pauseDurationMs: number;
 }
 
+// Socratic Mode Event Payloads
+export interface SocraticDialogueStartedPayload {
+  dialogueId: string;
+  targetConcept: string;
+  openingQuestionType: 'clarifying' | 'probing' | 'scaffolding' | 'challenging' | 'reflection' | 'metacognitive';
+  adaptiveConfigSummary: {
+    scaffoldLevel: number;
+    questionStyle: 'challenging' | 'supportive' | 'neutral';
+    abstractionLevel: 'concrete' | 'abstract' | 'balanced';
+  };
+}
+
+export interface SocraticExchangePayload {
+  dialogueId: string;
+  exchangeNumber: number;
+  questionType: 'clarifying' | 'probing' | 'scaffolding' | 'challenging' | 'reflection' | 'metacognitive';
+  tutorQuestion: string;
+  learnerResponse: string;
+  responseLatencyMs: number;
+  // Extracted psychometrics summary
+  extractedPsychometrics: {
+    explanationQuality: number;
+    hedgingRate: number;
+    certaintyRate: number;
+    selfCorrectionCount: number;
+    engagementLevel: 'high' | 'medium' | 'low';
+    reasoningStyle: 'deductive' | 'inductive' | 'mixed';
+  };
+  understandingLevel: 'none' | 'surface' | 'partial' | 'deep' | 'transfer';
+  ledToDiscovery: boolean;
+  misconceptionsDetected: string[];
+}
+
+export interface SocraticDiscoveryPayload {
+  dialogueId: string;
+  exchangeNumber: number;
+  discoveryDescription: string;
+  insightsDetected: string[];
+  triggerQuestion: string;
+  understandingBeforeDiscovery: 'none' | 'surface' | 'partial';
+  understandingAfterDiscovery: 'deep' | 'transfer';
+}
+
+export interface SocraticDialogueCompletedPayload {
+  dialogueId: string;
+  totalExchanges: number;
+  discoveryAchieved: boolean;
+  finalUnderstandingLevel: 'none' | 'surface' | 'partial' | 'deep' | 'transfer';
+  effectivenessScore: number;
+  durationMs: number;
+  // Aggregated psychometrics
+  aggregatedPsychometrics: {
+    avgExplanationQuality: number;
+    avgHedgingRate: number;
+    avgCertaintyRate: number;
+    totalSelfCorrections: number;
+    totalInsights: number;
+    calibrationAccuracy: number;
+    dominantReasoningStyle: 'deductive' | 'inductive' | 'mixed';
+    overallEngagement: 'high' | 'medium' | 'low';
+  };
+  keyInsights: string[];
+  misconceptionsIdentified: string[];
+  // Profile update summary
+  profileUpdates: {
+    masteryAdjustment: number;
+    newMisconceptions: string[];
+  };
+}
+
 // Union type for all payloads
 export type InteractionPayload =
   | PracticeAttemptPayload
@@ -184,6 +259,10 @@ export type InteractionPayload =
   | SessionEndedPayload
   | SessionPausedPayload
   | SessionResumedPayload
+  | SocraticDialogueStartedPayload
+  | SocraticExchangePayload
+  | SocraticDiscoveryPayload
+  | SocraticDialogueCompletedPayload
   | Record<string, unknown>; // Fallback for extensibility
 
 // ============================================================================

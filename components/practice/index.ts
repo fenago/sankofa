@@ -17,3 +17,6 @@ export { DesirableDifficultyIndicator } from './DesirableDifficultyIndicator'
 export { ExploreFirstMode } from './ExploreFirstMode'
 export { ConsolidationView } from './ConsolidationView'
 export { AttemptTimeline } from './AttemptTimeline'
+
+// Socratic Mode
+export { SocraticInfoDialog } from './SocraticInfoDialog'

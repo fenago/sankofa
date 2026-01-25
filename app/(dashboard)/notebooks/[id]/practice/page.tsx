@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Target, BookOpen, RotateCcw, Zap, Clock, Trophy, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, Target, BookOpen, RotateCcw, Zap, Clock, Trophy, HelpCircle, MessageCircle, GraduationCap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -31,7 +31,10 @@ import {
   FeedbackPanel,
   WorkedExample,
   SessionSummary,
+  SocraticInfoDialog,
 } from '@/components/practice'
+import { SocraticDialogueContainer, InverseSocraticDialogue, FreeformTutoringDialogue } from '@/components/tutoring'
+import type { DialogueSummary as SocraticSummary } from '@/hooks/useSocraticDialogue'
 import { cn } from '@/lib/utils'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/swr-config'
@@ -40,7 +43,7 @@ interface PracticePageProps {
   params: Promise<{ id: string }>
 }
 
-type PracticeMode = 'zpd' | 'review' | 'skill' | 'adaptive'
+type PracticeMode = 'zpd' | 'review' | 'skill' | 'adaptive' | 'socratic' | 'inverse_socratic' | 'freeform'
 
 interface ZPDSkill {
   id: string
@@ -65,7 +68,10 @@ export default function PracticePage({ params }: PracticePageProps) {
   // Practice configuration
   const [mode, setMode] = useState<PracticeMode>('zpd')
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>()
+  const [selectedSkillName, setSelectedSkillName] = useState<string | undefined>()
   const [sessionStarted, setSessionStarted] = useState(false)
+  const [socraticComplete, setSocraticComplete] = useState(false)
+  const [socraticSummary, setSocraticSummary] = useState<SocraticSummary | null>(null)
 
   // Timer for response time tracking
   const questionStartTime = useRef<number>(Date.now())
@@ -89,9 +95,11 @@ export default function PracticePage({ params }: PracticePageProps) {
     dismissIntervention,
   } = useAdaptiveLearning(notebookId)
 
-  // Practice session
+  // Practice session (not used for dialogue modes)
+  const isDialogueMode = mode === 'socratic' || mode === 'inverse_socratic' || mode === 'freeform'
+  const practiceMode = isDialogueMode ? 'zpd' : mode
   const practice = usePractice(notebookId, {
-    mode: sessionStarted ? mode : 'zpd', // Only fetch when session started
+    mode: sessionStarted && !isDialogueMode ? practiceMode : 'zpd', // Only fetch when session started (and not dialogue modes)
     skillId: selectedSkillId,
     count: mode === 'adaptive' ? 10 : 5,
   })
@@ -161,7 +169,7 @@ export default function PracticePage({ params }: PracticePageProps) {
 
   // Start session
   const handleStartSession = useCallback(() => {
-    if (mode === 'skill' && !selectedSkillId) {
+    if ((mode === 'skill' || mode === 'socratic' || mode === 'inverse_socratic' || mode === 'freeform') && !selectedSkillId) {
       toast({
         title: 'Select a skill',
         description: 'Please select a skill to practice',
@@ -169,14 +177,25 @@ export default function PracticePage({ params }: PracticePageProps) {
       })
       return
     }
+    setSocraticComplete(false)
+    setSocraticSummary(null)
     setSessionStarted(true)
   }, [mode, selectedSkillId, toast])
+
+  // Handle Socratic dialogue completion
+  const handleSocraticComplete = useCallback((summary: SocraticSummary) => {
+    setSocraticSummary(summary)
+    setSocraticComplete(true)
+  }, [])
 
   // Reset and go back to mode selection
   const handleBackToSelection = useCallback(() => {
     resetSession()
     setSessionStarted(false)
     setSelectedSkillId(undefined)
+    setSelectedSkillName(undefined)
+    setSocraticComplete(false)
+    setSocraticSummary(null)
   }, [resetSession])
 
   // Scaffold level info
@@ -228,7 +247,7 @@ export default function PracticePage({ params }: PracticePageProps) {
                 <h1 className="font-semibold">Practice</h1>
                 <p className="text-xs text-muted-foreground">{notebook.name}</p>
               </div>
-              {sessionStarted && hasQuestions && (
+              {sessionStarted && !isDialogueMode && hasQuestions && (
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1.5">
                     <Target className="h-4 w-4 text-green-500" />
@@ -241,9 +260,27 @@ export default function PracticePage({ params }: PracticePageProps) {
                   </div>
                 </div>
               )}
+              {sessionStarted && mode === 'socratic' && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <MessageCircle className="h-3 w-3" />
+                  Socratic Mode
+                </Badge>
+              )}
+              {sessionStarted && mode === 'inverse_socratic' && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <GraduationCap className="h-3 w-3" />
+                  Teaching Mode
+                </Badge>
+              )}
+              {sessionStarted && mode === 'freeform' && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <MessageCircle className="h-3 w-3" />
+                  Freeform Tutor
+                </Badge>
+              )}
             </div>
-            {/* Progress bar */}
-            {sessionStarted && hasQuestions && !sessionEnded && (
+            {/* Progress bar (non-dialogue modes) */}
+            {sessionStarted && !isDialogueMode && hasQuestions && !sessionEnded && (
               <Progress value={progress} className="h-1 mt-2" />
             )}
           </div>
@@ -301,6 +338,59 @@ export default function PracticePage({ params }: PracticePageProps) {
                       title="Adaptive Session"
                       description="AI-optimized question selection"
                     />
+                    <ModeCard
+                      mode="socratic"
+                      currentMode={mode}
+                      onSelect={setMode}
+                      icon={<MessageCircle className="h-5 w-5" />}
+                      title="Socratic Dialogue"
+                      description="Conversational learning through guided questioning"
+                      badge="New"
+                      extra={
+                        <SocraticInfoDialog
+                          trigger={
+                            <span
+                              className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              How does this work?
+                            </span>
+                          }
+                        />
+                      }
+                    />
+                    <ModeCard
+                      mode="inverse_socratic"
+                      currentMode={mode}
+                      onSelect={setMode}
+                      icon={<GraduationCap className="h-5 w-5" />}
+                      title="Learning by Teaching"
+                      description="Teach an AI student to deepen your understanding"
+                      badge="New"
+                      extra={
+                        <span
+                          className="text-xs text-muted-foreground"
+                        >
+                          50%+ retention boost
+                        </span>
+                      }
+                    />
+                    <ModeCard
+                      mode="freeform"
+                      currentMode={mode}
+                      onSelect={setMode}
+                      icon={<MessageCircle className="h-5 w-5" />}
+                      title="Freeform Tutoring"
+                      description="Ask questions and explore topics freely with an adaptive AI tutor"
+                      badge="New"
+                      extra={
+                        <span
+                          className="text-xs text-muted-foreground"
+                        >
+                          User-driven learning
+                        </span>
+                      }
+                    />
                   </div>
 
                   {/* Skill Selector (for skill mode) */}
@@ -322,15 +412,105 @@ export default function PracticePage({ params }: PracticePageProps) {
                     </div>
                   )}
 
+                  {/* Skill Selector (for socratic mode) */}
+                  {mode === 'socratic' && (
+                    <div className="pt-2">
+                      <label className="text-sm font-medium mb-2 block">Select a Skill for Dialogue</label>
+                      <Select
+                        value={selectedSkillId}
+                        onValueChange={(value) => {
+                          setSelectedSkillId(value)
+                          const skill = zpdData?.zpdSkills?.find(s => s.id === value)
+                          setSelectedSkillName(skill?.name)
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a skill to explore" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {zpdData?.zpdSkills?.map((skill) => (
+                            <SelectItem key={skill.id} value={skill.id}>
+                              {skill.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        In Socratic mode, you'll engage in a conversation that helps you discover understanding through guided questions.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Skill Selector (for inverse socratic mode) */}
+                  {mode === 'inverse_socratic' && (
+                    <div className="pt-2">
+                      <label className="text-sm font-medium mb-2 block">Select a Skill to Teach</label>
+                      <Select
+                        value={selectedSkillId}
+                        onValueChange={(value) => {
+                          setSelectedSkillId(value)
+                          const skill = zpdData?.zpdSkills?.find(s => s.id === value)
+                          setSelectedSkillName(skill?.name)
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a skill to teach" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {zpdData?.zpdSkills?.map((skill) => (
+                            <SelectItem key={skill.id} value={skill.id}>
+                              {skill.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        In Learning by Teaching mode, you'll explain concepts to an AI learner. Teaching others is one of the most effective ways to solidify your own understanding (the Protégé Effect).
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Skill Selector (for freeform tutoring mode) */}
+                  {mode === 'freeform' && (
+                    <div className="pt-2">
+                      <label className="text-sm font-medium mb-2 block">Select a Skill to Explore</label>
+                      <Select
+                        value={selectedSkillId}
+                        onValueChange={(value) => {
+                          setSelectedSkillId(value)
+                          const skill = zpdData?.zpdSkills?.find(s => s.id === value)
+                          setSelectedSkillName(skill?.name)
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a skill to explore" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {zpdData?.zpdSkills?.map((skill) => (
+                            <SelectItem key={skill.id} value={skill.id}>
+                              {skill.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        In Freeform Tutoring mode, you drive the conversation. Ask questions, explore concepts, and get adaptive explanations based on your learning profile.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Start Button */}
                   <div className="pt-4">
                     <Button
                       onClick={handleStartSession}
                       className="w-full"
                       size="lg"
-                      disabled={mode === 'skill' && !selectedSkillId}
+                      disabled={(mode === 'skill' || mode === 'socratic' || mode === 'inverse_socratic' || mode === 'freeform') && !selectedSkillId}
                     >
-                      Start Practice Session
+                      {mode === 'socratic' ? 'Start Socratic Dialogue' :
+                       mode === 'inverse_socratic' ? 'Start Teaching Session' :
+                       mode === 'freeform' ? 'Start Freeform Tutoring' :
+                       'Start Practice Session'}
                     </Button>
                   </div>
                 </CardContent>
@@ -360,16 +540,78 @@ export default function PracticePage({ params }: PracticePageProps) {
             </div>
           )}
 
-          {/* Session Loading */}
-          {sessionStarted && isLoading && (
+          {/* Session Loading (non-dialogue modes) */}
+          {sessionStarted && !isDialogueMode && isLoading && (
             <div className="flex flex-col items-center justify-center h-64 space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-muted-foreground">Loading questions...</p>
             </div>
           )}
 
-          {/* No Questions Available */}
-          {sessionStarted && !isLoading && !hasQuestions && !sessionEnded && (
+          {/* Socratic Dialogue Mode */}
+          {sessionStarted && mode === 'socratic' && selectedSkillId && selectedSkillName && (
+            <SocraticDialogueContainer
+              notebookId={notebookId}
+              skillId={selectedSkillId}
+              skillName={selectedSkillName}
+              targetConcept={selectedSkillName}
+              misconceptions={[]}
+              onComplete={handleSocraticComplete}
+              onExit={handleBackToSelection}
+            />
+          )}
+
+          {/* Inverse Socratic (Learning by Teaching) Mode */}
+          {sessionStarted && mode === 'inverse_socratic' && selectedSkillId && selectedSkillName && (
+            <InverseSocraticDialogue
+              notebookId={notebookId}
+              skillId={selectedSkillId}
+              skillName={selectedSkillName}
+              targetConcept={selectedSkillName}
+              onComplete={(summary) => {
+                setSocraticSummary({
+                  totalExchanges: summary.totalExchanges,
+                  discoveryMade: summary.learnerUnderstanding >= 0.7,
+                  finalUnderstanding: summary.learnerUnderstanding >= 0.8 ? 'deep' : summary.learnerUnderstanding >= 0.5 ? 'partial' : 'surface',
+                  effectivenessScore: summary.overallTeachingScore * 100,
+                  keyInsights: summary.psychometricHighlights.map(p => p.interpretation),
+                  misconceptions: [],
+                  avgEngagement: summary.overallTeachingScore >= 0.7 ? 'high' : summary.overallTeachingScore >= 0.4 ? 'medium' : 'low',
+                  avgConfidence: 'medium',
+                  duration: `${summary.totalExchanges} exchanges`,
+                })
+                setSocraticComplete(true)
+              }}
+              onExit={handleBackToSelection}
+            />
+          )}
+
+          {/* Freeform Tutoring Mode */}
+          {sessionStarted && mode === 'freeform' && selectedSkillId && selectedSkillName && (
+            <FreeformTutoringDialogue
+              notebookId={notebookId}
+              skillId={selectedSkillId}
+              skillName={selectedSkillName}
+              onComplete={(summary) => {
+                setSocraticSummary({
+                  totalExchanges: summary.totalExchanges,
+                  discoveryMade: summary.insightsGained.length > 0,
+                  finalUnderstanding: summary.metrics.understandingScore >= 0.8 ? 'deep' : summary.metrics.understandingScore >= 0.5 ? 'partial' : 'surface',
+                  effectivenessScore: summary.metrics.engagementScore * 100,
+                  keyInsights: summary.insightsGained,
+                  misconceptions: [],
+                  avgEngagement: summary.metrics.engagementScore >= 0.7 ? 'high' : summary.metrics.engagementScore >= 0.4 ? 'medium' : 'low',
+                  avgConfidence: 'medium',
+                  duration: `${summary.totalExchanges} exchanges`,
+                })
+                setSocraticComplete(true)
+              }}
+              onExit={handleBackToSelection}
+            />
+          )}
+
+          {/* No Questions Available (non-dialogue modes) */}
+          {sessionStarted && !isDialogueMode && !isLoading && !hasQuestions && !sessionEnded && (
             <Card className="text-center py-12">
               <CardContent>
                 <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -385,8 +627,8 @@ export default function PracticePage({ params }: PracticePageProps) {
             </Card>
           )}
 
-          {/* Active Practice Session */}
-          {sessionStarted && !isLoading && hasQuestions && !sessionEnded && currentQuestion && (
+          {/* Active Practice Session (non-dialogue modes) */}
+          {sessionStarted && !isDialogueMode && !isLoading && hasQuestions && !sessionEnded && currentQuestion && (
             <div className="space-y-4">
               {/* Skill & Scaffold Info */}
               <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -541,8 +783,8 @@ export default function PracticePage({ params }: PracticePageProps) {
             </div>
           )}
 
-          {/* Session Summary */}
-          {sessionEnded && (
+          {/* Session Summary (non-dialogue modes) */}
+          {sessionEnded && !isDialogueMode && (
             <div className="space-y-4">
               <SessionSummary
                 answered={answered}
@@ -585,6 +827,7 @@ function ModeCard({
   description,
   badge,
   recommended,
+  extra,
 }: {
   mode: PracticeMode
   currentMode: PracticeMode
@@ -594,6 +837,7 @@ function ModeCard({
   description: string
   badge?: string
   recommended?: boolean
+  extra?: React.ReactNode
 }) {
   const isSelected = mode === currentMode
 
@@ -622,11 +866,14 @@ function ModeCard({
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm">{title}</h4>
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-          {badge && (
-            <Badge variant="secondary" className="mt-2 text-xs">
-              {badge}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 mt-2">
+            {badge && (
+              <Badge variant="secondary" className="text-xs">
+                {badge}
+              </Badge>
+            )}
+            {extra}
+          </div>
         </div>
       </div>
     </button>

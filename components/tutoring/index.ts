@@ -1,3 +1,7 @@
 export { SocraticTutor } from './SocraticTutor'
+export { SocraticDialogueContainer } from './SocraticDialogueContainer'
 export { ThinkingPrompt } from './ThinkingPrompt'
 export { DiscoveryMoment } from './DiscoveryMoment'
+export { DialogueSummary } from './DialogueSummary'
+export { InverseSocraticDialogue } from './InverseSocraticDialogue'
+export { FreeformTutoringDialogue } from './FreeformTutoringDialogue'
