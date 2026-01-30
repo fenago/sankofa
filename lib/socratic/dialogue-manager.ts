@@ -289,7 +289,9 @@ export function processExchange(params: ExchangeParams): ExchangeResult {
   const extraction = extractFromResponse(learnerResponse, responseLatencyMs, context)
 
   // Update correctness record (based on understanding level)
-  const isCorrect = ['partial', 'deep', 'transfer'].includes(
+  // Include 'surface' as acceptable - it's normal early in dialogue
+  // Only 'none' is considered a failure that counts toward consecutiveFailures
+  const isCorrect = ['surface', 'partial', 'deep', 'transfer'].includes(
     extraction.overallAssessment.understandingLevel
   )
 
@@ -346,10 +348,10 @@ export function processExchange(params: ExchangeParams): ExchangeResult {
   const intervention = checkForInterventions(profile, updatedSessionState, extraction)
 
   // Determine if dialogue should complete
+  // Note: switch_topic and take_break are suggestions, not automatic endings
+  // The user can click "Keep Going" to continue
   const shouldComplete =
     updatedState.discoveryMade ||
-    intervention.type === 'take_break' ||
-    intervention.type === 'switch_topic' ||
     updatedSessionState.exchangeCount >= 15 || // Max exchanges
     (extraction.overallAssessment.understandingLevel === 'transfer' &&
       updatedSessionState.consecutiveSuccesses >= 2)

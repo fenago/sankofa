@@ -729,8 +729,9 @@ export function checkForInterventions(
     }
   }
 
-  // Check consecutive failures
-  if (sessionState.consecutiveFailures >= 3) {
+  // Check consecutive failures - only suggest switching after enough attempts
+  // and at least 5 exchanges to give the learner a fair chance
+  if (sessionState.consecutiveFailures >= 4 && sessionState.exchangeCount >= 5) {
     return {
       type: 'switch_topic',
       message: "Let's try a different angle on this topic.",

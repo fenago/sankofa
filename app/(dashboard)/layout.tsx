@@ -18,10 +18,10 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Particles Background */}
       <ParticlesBackground
-        particleDensity={50}
-        minSize={3}
-        maxSize={7}
-        speed={1.5}
+        particleDensity={30}
+        minSize={2}
+        maxSize={5}
+        speed={0.8}
       />
 
       {/* Header */}
@@ -38,7 +38,7 @@ export default function DashboardLayout({
               <span className="text-[10px] text-muted-foreground leading-tight">by DrLee.AI</span>
             </div>
             <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-mono font-medium">
-              v0.3.0
+              v0.4.0
             </span>
           </Link>
 

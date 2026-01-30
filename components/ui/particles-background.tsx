@@ -54,27 +54,14 @@ export const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
             enable: false,
             zIndex: 0,
           },
-          fpsLimit: 120,
+          fpsLimit: 30,
           interactivity: {
             events: {
               onClick: {
-                enable: true,
-                mode: "push",
+                enable: false,
               },
               onHover: {
-                enable: true,
-                mode: "grab",
-              },
-            },
-            modes: {
-              push: {
-                quantity: 4,
-              },
-              grab: {
-                distance: 200,
-                links: {
-                  opacity: 0.5,
-                },
+                enable: false,
               },
             },
           },
@@ -106,15 +93,7 @@ export const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
               value: particleDensity,
             },
             opacity: {
-              value: {
-                min: 0.3,
-                max: 0.8,
-              },
-              animation: {
-                enable: true,
-                speed: 0.5,
-                sync: false,
-              },
+              value: 0.6,
             },
             shape: {
               type: "circle",
