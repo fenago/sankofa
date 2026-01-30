@@ -9,6 +9,7 @@ import {
   Swords,
   Lightbulb,
   Brain,
+  Target,
 } from 'lucide-react'
 import type { QuestionType } from '@/lib/tutoring/socratic-tutor'
 
@@ -16,6 +17,7 @@ interface ThinkingPromptProps {
   questionType: QuestionType
   question: string
   hint?: string
+  learningObjective?: string
 }
 
 const questionTypeConfig: Record<
@@ -76,6 +78,7 @@ export function ThinkingPrompt({
   questionType,
   question,
   hint,
+  learningObjective,
 }: ThinkingPromptProps) {
   const config = questionTypeConfig[questionType]
 
@@ -104,8 +107,18 @@ export function ThinkingPrompt({
           </div>
         </div>
 
+        {/* Learning objective reminder */}
+        {learningObjective && (
+          <div className="mt-3 pt-3 border-t border-dashed flex items-center gap-2 text-xs text-muted-foreground bg-white/50 -mx-4 px-4 py-2 rounded-b-lg">
+            <Target className="h-3 w-3 text-primary" />
+            <span>
+              <strong className="text-foreground">Learning goal:</strong> {learningObjective}
+            </span>
+          </div>
+        )}
+
         {/* Thinking encouragement */}
-        <div className="mt-4 pt-3 border-t flex items-center gap-2 text-xs text-muted-foreground">
+        <div className={`mt-3 pt-3 ${learningObjective ? '' : 'border-t'} flex items-center gap-2 text-xs text-muted-foreground`}>
           <Brain className="h-3 w-3" />
           <span>Take your time to think through this. There's no wrong answer - your reasoning matters.</span>
         </div>

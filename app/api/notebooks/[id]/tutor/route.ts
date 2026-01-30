@@ -621,16 +621,48 @@ async function handleStartSocraticDialogue(
     contents: [
       {
         role: 'user',
-        parts: [{ text: `${systemPrompt}\n\nGenerate an engaging opening Socratic question to begin exploring the student's understanding of "${targetConcept}" in the context of ${skillName}.\n\nThe question should:\n1. Be friendly and inviting\n2. Help understand what they already know\n3. Match their profile (${inverseProfile?.cognitive_indicators?.expertiseLevel || 'unknown'} level)\n4. Open up opportunities for deeper exploration\n\nRespond with ONLY the question - no explanation or preamble.` }],
+        parts: [{ text: `${systemPrompt}
+
+Generate an engaging opening Socratic question to begin exploring the student's understanding of "${targetConcept}" in the context of ${skillName}.
+
+The question should:
+1. Be friendly and inviting
+2. Help understand what they already know
+3. Match their profile (${inverseProfile?.cognitive_indicators?.expertiseLevel || 'unknown'} level)
+4. Open up opportunities for deeper exploration
+
+IMPORTANT - Make the connection clear:
+- If you use an analogy or everyday example, briefly explain WHY you're asking about it
+- Add a short parenthetical hint that connects the example to ${targetConcept}
+- Example: "What's your favorite snack? (We're going to use this to explore different types of data!)"
+- The learner should understand HOW this question relates to what they're trying to learn
+
+Respond with ONLY the question (including the hint) - no explanation or preamble.` }],
       },
     ],
     config: {
       temperature: 0.7,
-      maxOutputTokens: 256,
+      maxOutputTokens: 300,
     },
   })
 
   const aiOpeningQuestion = result.text?.trim() || openingQuestion
+
+  // Store the opening question in the dialogue state so we know what was asked
+  // This is critical - without this, the first exchange doesn't know what question to reference
+  dialogue.state.exchanges.push({
+    id: `exchange-${Date.now()}`,
+    skillId: skillId,
+    tutorQuestion: aiOpeningQuestion,
+    questionType: 'clarifying',
+    studentResponse: undefined,
+    detectedUnderstanding: undefined,
+    ledToDiscovery: false,
+    timestamp: new Date(),
+  })
+
+  // Update the stored dialogue with the opening question
+  activeDialogues.set(dialogue.id, dialogue)
 
   return NextResponse.json({
     success: true,
@@ -751,12 +783,63 @@ async function handleSocraticExchange(
   // Generate AI follow-up question if dialogue continues
   let aiNextQuestion: string | null = null
   if (!exchangeResult.isDialogueComplete && exchangeResult.nextQuestion) {
+    // Build conversation history for context (only include completed exchanges with responses)
+    const completedExchanges = exchangeResult.dialogue.state.exchanges.filter(e => e.studentResponse)
+    const conversationHistory = completedExchanges.map((e, i) =>
+      `Exchange ${i + 1}:\nTutor: ${e.tutorQuestion}\nLearner: ${e.studentResponse}`
+    ).join('\n\n')
+
+    // Get the question that was just asked (before this response)
+    const lastAskedQuestion = exchangeResult.dialogue.state.exchanges
+      .filter(e => e.tutorQuestion && !e.studentResponse)[0]?.tutorQuestion
+      || exchangeResult.dialogue.state.exchanges[exchangeResult.dialogue.state.exchanges.length - 1]?.tutorQuestion
+      || 'the opening question'
+
+    // Build a prompt that includes the learner's response and requires acknowledgment
+    const followUpPrompt = `${exchangeResult.systemPrompt}
+
+LEARNING OBJECTIVE: Help the learner understand "${dialogue.targetConcept}" in the context of ${dialogue.skillName}.
+
+CONVERSATION SO FAR:
+${conversationHistory || 'This is the beginning of our dialogue.'}
+
+YOU ASKED:
+"${lastAskedQuestion}"
+
+THE LEARNER RESPONDED:
+"${learnerResponse}"
+
+ANALYSIS OF THEIR RESPONSE:
+- Understanding level: ${exchangeResult.extraction.overallAssessment.understandingLevel}
+- Key points they made: ${exchangeResult.extraction.insightsDetected.join(', ') || 'Still exploring'}
+${exchangeResult.extraction.misconceptions.length > 0 ? `- Misconceptions detected: ${exchangeResult.extraction.misconceptions.join(', ')}` : ''}
+${exchangeResult.extraction.overallAssessment.isDiscoveryMoment ? '- 🎉 DISCOVERY MOMENT! They had a breakthrough!' : ''}
+
+YOUR TASK:
+1. FIRST, briefly acknowledge what they said - show you understood their response
+2. THEN, ${exchangeResult.extraction.overallAssessment.isDiscoveryMoment
+  ? 'celebrate their insight and ask them to reflect on what they discovered'
+  : exchangeResult.extraction.misconceptions.length > 0
+    ? 'gently address their misconception with a guiding question'
+    : 'ask a follow-up question that builds on their answer'}
+
+CRITICAL - PROVIDE SCAFFOLDING:
+- Your questions should help the learner connect their everyday thinking to the concept of "${dialogue.targetConcept}"
+- After your question, add a brief HINT in parentheses that subtly connects the analogy/example to the learning objective
+- Example format: "Your question here? (Hint: Think about how this relates to [concept]...)"
+- The hint should NOT give away the answer, but should help them see WHY you're asking this question
+- If using an analogy (like snacks, superheroes, etc.), explicitly bridge it back to ${dialogue.skillName}
+
+${exchangeResult.nextQuestion}
+
+Respond naturally as a Socratic tutor. Be conversational, warm, and genuinely curious about their thinking. Do NOT repeat questions they've already answered.`
+
     const result = await ai.models.generateContent({
       model: MODEL,
       contents: [
         {
           role: 'user',
-          parts: [{ text: `${exchangeResult.systemPrompt}\n\n${exchangeResult.nextQuestion}` }],
+          parts: [{ text: followUpPrompt }],
         },
       ],
       config: {

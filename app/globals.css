@@ -4,48 +4,95 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    /* Professional indigo/violet color scheme for education */
+    --background: 240 20% 99%;
+    --foreground: 240 10% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 240 10% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
+    --popover-foreground: 240 10% 10%;
+
+    /* Indigo primary for trust, knowledge, intelligence */
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 0%;
-    --muted: 0 0% 95%;
-    --muted-foreground: 0 0% 30%;
-    --accent: 0 0% 92%;
-    --accent-foreground: 0 0% 0%;
+
+    /* Soft violet secondary */
+    --secondary: 250 95% 97%;
+    --secondary-foreground: 239 84% 50%;
+
+    /* Muted tones */
+    --muted: 240 10% 96%;
+    --muted-foreground: 240 5% 46%;
+
+    /* Accent - warm violet */
+    --accent: 262 83% 95%;
+    --accent-foreground: 262 83% 50%;
+
+    /* Semantic colors */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
-    --radius: 0.5rem;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 240 10% 90%;
+    --input: 240 10% 90%;
+    --ring: 239 84% 67%;
+    --radius: 0.625rem;
+
+    /* Chart colors */
+    --chart-1: 239 84% 67%;
+    --chart-2: 262 83% 58%;
+    --chart-3: 291 64% 42%;
+    --chart-4: 142 76% 36%;
+    --chart-5: 38 92% 50%;
   }
 
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 75%;
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 100%;
+    --background: 240 10% 7%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Indigo primary - slightly brighter for dark mode */
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Dark mode secondary */
+    --secondary: 240 10% 15%;
+    --secondary-foreground: 239 84% 70%;
+
+    /* Dark muted */
+    --muted: 240 10% 18%;
+    --muted-foreground: 240 5% 65%;
+
+    /* Dark accent */
+    --accent: 262 40% 20%;
+    --accent-foreground: 262 83% 70%;
+
+    /* Semantic colors */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 0% 100%;
+    --success: 142 76% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Dark borders */
+    --border: 240 10% 20%;
+    --input: 240 10% 20%;
+    --ring: 239 84% 67%;
+
+    /* Chart colors for dark mode */
+    --chart-1: 239 84% 67%;
+    --chart-2: 262 83% 65%;
+    --chart-3: 291 64% 55%;
+    --chart-4: 142 76% 50%;
+    --chart-5: 38 92% 60%;
   }
 }
 
@@ -67,6 +114,22 @@
       Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     letter-spacing: -0.02em;
   }
+}
+
+/* Gradient backgrounds for sections */
+.gradient-primary {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(262 83% 58%) 100%);
+}
+
+.gradient-subtle {
+  background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 100%);
+}
+
+/* Glass morphism effect */
+.glass {
+  background: hsla(var(--background) / 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* Hide React Flow attribution watermark */
@@ -115,4 +178,23 @@
 
 .animate-breathe-out {
   animation: breathe-out 4s ease-in-out;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }

@@ -60,22 +60,22 @@ function LoginForm() {
   }
 
   return (
-    <Card className="border-gray-200 shadow-lg">
+    <Card className="border-border/50 shadow-xl bg-card/80 backdrop-blur-sm">
       <CardHeader className="space-y-1 text-center">
         <div className="flex justify-center mb-4">
-          <div className="h-12 w-12 rounded-full bg-black flex items-center justify-center">
-            <BookOpen className="h-6 w-6 text-white" />
+          <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+            <BookOpen className="h-6 w-6 text-primary-foreground" />
           </div>
         </div>
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
         <CardDescription>
           Sign in to your LearnGraph account
         </CardDescription>
-        <p className="text-[10px] text-gray-400 mt-1">by DrLee.AI</p>
+        <p className="text-[10px] text-muted-foreground mt-1">by DrLee.AI</p>
       </CardHeader>
       <CardContent>
         {(error || authError) && (
-          <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 flex items-center gap-2 text-sm text-red-700">
+          <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-sm text-destructive">
             <AlertCircle className="h-4 w-4" />
             {error || 'Authentication failed. Please try again.'}
           </div>
@@ -92,6 +92,7 @@ function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
+              className="bg-background/50"
             />
           </div>
           <div className="space-y-2">
@@ -104,9 +105,10 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
+              className="bg-background/50"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full shadow-lg shadow-primary/25" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -120,17 +122,17 @@ function LoginForm() {
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
+            <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-gray-500">Or continue with</span>
+            <span className="bg-card/80 px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
 
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="w-full bg-background/50"
           onClick={handleGoogleLogin}
           disabled={loading}
         >
@@ -155,9 +157,9 @@ function LoginForm() {
           Google
         </Button>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           Don't have an account?{' '}
-          <Link href="/signup" className="font-medium text-black hover:underline">
+          <Link href="/signup" className="font-medium text-primary hover:underline">
             Sign up
           </Link>
         </p>
@@ -168,22 +170,22 @@ function LoginForm() {
 
 function LoginFormFallback() {
   return (
-    <Card className="border-gray-200 shadow-lg">
+    <Card className="border-border/50 shadow-xl bg-card/80 backdrop-blur-sm">
       <CardHeader className="space-y-1 text-center">
         <div className="flex justify-center mb-4">
-          <div className="h-12 w-12 rounded-full bg-black flex items-center justify-center">
-            <BookOpen className="h-6 w-6 text-white" />
+          <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+            <BookOpen className="h-6 w-6 text-primary-foreground" />
           </div>
         </div>
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
         <CardDescription>
           Sign in to your LearnGraph account
         </CardDescription>
-        <p className="text-[10px] text-gray-400 mt-1">by DrLee.AI</p>
+        <p className="text-[10px] text-muted-foreground mt-1">by DrLee.AI</p>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </CardContent>
     </Card>

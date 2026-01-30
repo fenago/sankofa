@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { NotebookCard } from './NotebookCard'
 import { CreateNotebookDialog } from './CreateNotebookDialog'
 import { useNotebooks } from '@/hooks/useNotebooks'
-import { Loader2, BookOpen, FlaskConical } from 'lucide-react'
+import { Loader2, BookOpen, FlaskConical, Sparkles } from 'lucide-react'
 
 export function NotebookList() {
   const { notebooks, loading, error, createNotebook, deleteNotebook } = useNotebooks()
@@ -12,7 +12,7 @@ export function NotebookList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
       </div>
     )
   }
@@ -20,7 +20,7 @@ export function NotebookList() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Error: {error}</p>
+        <p className="text-destructive">Error: {error}</p>
       </div>
     )
   }
@@ -29,8 +29,10 @@ export function NotebookList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Notebooks</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+            Notebooks
+          </h1>
+          <p className="text-muted-foreground mt-1">
             Organize your learning by topic
           </p>
         </div>
@@ -41,7 +43,7 @@ export function NotebookList() {
       <div className="mb-4 text-right">
         <Link
           href="/research"
-          className="text-sm text-gray-500 hover:text-amber-600 hover:underline inline-flex items-center gap-1"
+          className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
         >
           <FlaskConical className="h-3 w-3" />
           Research Foundations (29 frameworks)
@@ -49,12 +51,14 @@ export function NotebookList() {
       </div>
 
       {notebooks.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
-          <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-700 mb-2">
+        <div className="text-center py-16 border-2 border-dashed border-border rounded-xl bg-card/50">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="h-8 w-8 text-primary/50" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">
             No notebooks yet
           </h3>
-          <p className="text-gray-500 mb-4">
+          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
             Create your first notebook to start organizing your learning materials.
           </p>
           <CreateNotebookDialog onCreateNotebook={createNotebook} />

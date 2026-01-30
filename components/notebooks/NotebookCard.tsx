@@ -29,12 +29,15 @@ export function NotebookCard({ notebook, onDelete }: NotebookCardProps) {
 
   return (
     <Link href={`/notebooks/${notebook.id}`}>
-      <Card className="h-full hover:shadow-md transition-shadow cursor-pointer group">
+      <Card className="h-full hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group border-border/50 bg-card/80 hover:border-primary/20">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <div
-              className="h-10 w-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: notebook.color || '#3b82f6' }}
+              className="h-10 w-10 rounded-lg flex items-center justify-center shadow-lg"
+              style={{
+                backgroundColor: notebook.color || '#6366f1',
+                boxShadow: `0 4px 14px -3px ${notebook.color || '#6366f1'}40`
+              }}
             >
               <BookOpen className="h-5 w-5 text-white" />
             </div>
@@ -50,7 +53,7 @@ export function NotebookCard({ notebook, onDelete }: NotebookCardProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600"
+                  className="text-destructive focus:text-destructive"
                   onClick={handleDelete}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -65,13 +68,13 @@ export function NotebookCard({ notebook, onDelete }: NotebookCardProps) {
         </CardHeader>
         <CardContent>
           {notebook.description ? (
-            <p className="text-sm text-gray-500 line-clamp-2">
+            <p className="text-sm text-muted-foreground line-clamp-2">
               {notebook.description}
             </p>
           ) : (
-            <p className="text-sm text-gray-400 italic">No description</p>
+            <p className="text-sm text-muted-foreground/60 italic">No description</p>
           )}
-          <p className="text-xs text-gray-400 mt-4">
+          <p className="text-xs text-muted-foreground/70 mt-4">
             Updated {formatDistanceToNow(new Date(notebook.updated_at || notebook.created_at || Date.now()), { addSuffix: true })}
           </p>
         </CardContent>

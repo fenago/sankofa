@@ -268,14 +268,14 @@ export default function PathPage({ params }: PathPageProps) {
       </div>
 
       {/* Main Graph Area */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1" style={{ minHeight: '500px' }}>
         <ReactFlowProvider>
           <PathVisualization
             notebookId={notebookId}
             skills={pathSkills}
             masteryThreshold={0.8}
             onStartPractice={handleStartPractice}
-            className="h-full"
+            className="h-full w-full"
           />
         </ReactFlowProvider>
       </div>

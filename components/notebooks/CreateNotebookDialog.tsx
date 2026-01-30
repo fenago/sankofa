@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,14 +19,14 @@ import {
 import type { Notebook } from '@/lib/types/database'
 
 const COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#ef4444', // red
+  '#6366f1', // indigo (primary)
   '#8b5cf6', // violet
+  '#a855f7', // purple
   '#ec4899', // pink
+  '#ef4444', // red
+  '#f59e0b', // amber
+  '#10b981', // emerald
   '#06b6d4', // cyan
-  '#84cc16', // lime
 ]
 
 interface CreateNotebookDialogProps {
@@ -71,7 +71,7 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="shadow-lg shadow-primary/25">
           <Plus className="h-4 w-4 mr-2" />
           New Notebook
         </Button>
@@ -79,7 +79,10 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create Notebook</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Create Notebook
+            </DialogTitle>
             <DialogDescription>
               Create a new notebook to organize your learning materials.
             </DialogDescription>
@@ -93,6 +96,7 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={loading}
+                className="bg-background"
               />
             </div>
             <div className="space-y-2">
@@ -104,6 +108,7 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={loading}
                 rows={3}
+                className="bg-background"
               />
             </div>
             <div className="space-y-2">
@@ -113,10 +118,15 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
                   <button
                     key={c}
                     type="button"
-                    className={`h-8 w-8 rounded-full transition-transform ${
-                      color === c ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : ''
+                    className={`h-8 w-8 rounded-full transition-all ${
+                      color === c
+                        ? 'ring-2 ring-offset-2 ring-primary scale-110'
+                        : 'hover:scale-105'
                     }`}
-                    style={{ backgroundColor: c }}
+                    style={{
+                      backgroundColor: c,
+                      boxShadow: color === c ? `0 4px 14px -3px ${c}60` : undefined
+                    }}
                     onClick={() => setColor(c)}
                     disabled={loading}
                   />
@@ -124,7 +134,7 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
               </div>
             </div>
             {error && (
-              <p className="text-sm text-red-500">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             )}
           </div>
           <DialogFooter>
@@ -136,7 +146,7 @@ export function CreateNotebookDialog({ onCreateNotebook }: CreateNotebookDialogP
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="shadow-lg shadow-primary/25">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

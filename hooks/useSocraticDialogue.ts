@@ -93,6 +93,7 @@ export function useSocraticDialogue(
   // State
   const [isLoading, setIsLoading] = useState(false)
   const [dialogueId, setDialogueId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [dialogueState, setDialogueState] = useState<DialogueState | null>(null)
   const [currentQuestion, setCurrentQuestion] = useState<string | null>(null)
   const [questionType, setQuestionType] = useState<QuestionType | null>(null)
@@ -115,6 +116,10 @@ export function useSocraticDialogue(
     setError(null)
     setSummary(null)
 
+    // Generate a new session ID for this dialogue
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    setSessionId(newSessionId)
+
     try {
       const response = await fetch(`/api/notebooks/${notebookId}/tutor`, {
         method: 'POST',
@@ -124,7 +129,8 @@ export function useSocraticDialogue(
           skillId,
           skillName,
           targetConcept,
-          misconceptions,
+          knownMisconceptions: misconceptions,
+          sessionId: newSessionId,
         }),
       })
 
@@ -149,7 +155,7 @@ export function useSocraticDialogue(
 
   // Send a response
   const sendResponse = useCallback(async (response: string) => {
-    if (!dialogueId) {
+    if (!dialogueId || !sessionId) {
       setError('No active dialogue')
       return
     }
@@ -168,6 +174,7 @@ export function useSocraticDialogue(
           dialogueId,
           learnerResponse: response,
           responseLatencyMs,
+          sessionId,
         }),
       })
 
@@ -208,11 +215,11 @@ export function useSocraticDialogue(
     } finally {
       setIsLoading(false)
     }
-  }, [dialogueId, notebookId, onDiscovery, onInterventionNeeded])
+  }, [dialogueId, sessionId, notebookId, onDiscovery, onInterventionNeeded])
 
   // Internal end dialogue (for auto-complete)
   const endDialogueInternal = useCallback(async () => {
-    if (!dialogueId) return null
+    if (!dialogueId || !sessionId) return null
 
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/tutor`, {
@@ -221,6 +228,7 @@ export function useSocraticDialogue(
         body: JSON.stringify({
           action: 'end_socratic',
           dialogueId,
+          sessionId,
         }),
       })
 
@@ -244,7 +252,7 @@ export function useSocraticDialogue(
       setError(err instanceof Error ? err.message : 'Unknown error')
       return null
     }
-  }, [dialogueId, notebookId, onDialogueComplete])
+  }, [dialogueId, sessionId, notebookId, onDialogueComplete])
 
   // End dialogue (user-triggered)
   const endDialogue = useCallback(async () => {
@@ -266,6 +274,7 @@ export function useSocraticDialogue(
   // Reset dialogue
   const resetDialogue = useCallback(() => {
     setDialogueId(null)
+    setSessionId(null)
     setDialogueState(null)
     setCurrentQuestion(null)
     setQuestionType(null)

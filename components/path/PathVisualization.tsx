@@ -233,6 +233,7 @@ export function PathVisualization({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
 
   // Update nodes/edges when data changes
   useEffect(() => {
@@ -254,10 +255,10 @@ export function PathVisualization({
   )
 
   return (
-    <div className={className}>
-      <div className="h-full flex">
+    <div className={`${className || ''} w-full`} style={{ height: '100%', minHeight: '500px' }}>
+      <div className="h-full w-full flex">
         {/* Main graph area */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative" style={{ minHeight: '500px' }}>
           {/* Controls overlay */}
           <div className="absolute top-4 left-4 right-4 z-10">
             <PathControls
@@ -267,9 +268,9 @@ export function PathVisualization({
               onFilterChange={setFilter}
               showLabels={showLabels}
               onShowLabelsChange={setShowLabels}
-              onZoomIn={() => {}}
-              onZoomOut={() => {}}
-              onFitView={() => {}}
+              onZoomIn={() => zoomIn({ duration: 200 })}
+              onZoomOut={() => zoomOut({ duration: 200 })}
+              onFitView={() => fitView({ duration: 200, padding: 0.2 })}
               stats={stats}
             />
           </div>

@@ -1,6 +1,6 @@
 {
   "name": "learn-graph",
-  "version": "0.2.26",
+  "version": "0.3.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -34,11 +34,14 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
     "@tailwindcss/typography": "^0.5.19",
+    "@tsparticles/engine": "^3.9.1",
+    "@tsparticles/react": "^3.0.0",
+    "@tsparticles/slim": "^3.9.1",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "framer-motion": "^12.23.26",
+    "framer-motion": "^12.29.2",
     "lucide-react": "^0.462.0",
     "mermaid": "^11.12.2",
     "neo4j-driver": "^6.0.1",

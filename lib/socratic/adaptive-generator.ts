@@ -765,8 +765,9 @@ export function checkForInterventions(
     }
   }
 
-  // Check low engagement
-  if (sessionState.currentEngagementLevel === 'low') {
+  // Check low engagement - only after a few exchanges to establish baseline
+  // Don't encourage too early - let them get into the flow first
+  if (sessionState.currentEngagementLevel === 'low' && sessionState.exchangeCount >= 3) {
     return {
       type: 'encourage',
       message: "Keep going - you're making progress!",

@@ -74,9 +74,11 @@ function SkillNodeComponent({ data, selected }: SkillNodeProps) {
     >
       {/* Input handle */}
       <Handle
+        id="target"
         type="target"
         position={Position.Top}
         className="!bg-gray-400 !w-2 !h-2"
+        isConnectable={false}
       />
 
       {/* Node content */}
@@ -122,9 +124,11 @@ function SkillNodeComponent({ data, selected }: SkillNodeProps) {
 
       {/* Output handle */}
       <Handle
+        id="source"
         type="source"
         position={Position.Bottom}
         className="!bg-gray-400 !w-2 !h-2"
+        isConnectable={false}
       />
     </div>
   )

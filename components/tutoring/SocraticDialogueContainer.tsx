@@ -243,8 +243,11 @@ export function SocraticDialogueContainer({
                 </TutorMessage>
               )}
 
-              {/* Exchanges */}
-              {exchanges.map((exchange, index) => (
+              {/* Exchanges - only show completed exchanges (with responses) */}
+              {/* The current unanswered question is shown via ThinkingPrompt below */}
+              {exchanges
+                .filter(e => e.learnerResponse) // Only show exchanges that have been answered
+                .map((exchange, index) => (
                 <div key={exchange.id} className="space-y-3">
                   {/* Tutor question */}
                   <TutorMessage>
@@ -263,9 +266,7 @@ export function SocraticDialogueContainer({
                   </TutorMessage>
 
                   {/* Student response */}
-                  {exchange.learnerResponse && (
-                    <StudentMessage>{exchange.learnerResponse}</StudentMessage>
-                  )}
+                  <StudentMessage>{exchange.learnerResponse}</StudentMessage>
                 </div>
               ))}
 
@@ -274,6 +275,7 @@ export function SocraticDialogueContainer({
                 <ThinkingPrompt
                   questionType={questionType}
                   question={currentQuestion || ''}
+                  learningObjective={targetConcept}
                 />
               )}
 
