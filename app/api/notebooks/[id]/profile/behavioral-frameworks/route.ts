@@ -53,12 +53,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       version: profileData.version,
       computed_at: profileData.computed_at,
       interactions_analyzed: profileData.interactions_analyzed,
-      knowledge_state: profileData.knowledge_state as InverseProfile['knowledge_state'],
-      cognitive_indicators: profileData.cognitive_indicators as InverseProfile['cognitive_indicators'],
-      metacognitive_indicators: profileData.metacognitive_indicators as InverseProfile['metacognitive_indicators'],
-      motivational_indicators: profileData.motivational_indicators as InverseProfile['motivational_indicators'],
-      behavioral_patterns: profileData.behavioral_patterns as InverseProfile['behavioral_patterns'],
-      confidence_scores: profileData.confidence_scores as InverseProfile['confidence_scores'],
+      knowledge_state: profileData.knowledge_state as unknown as InverseProfile['knowledge_state'],
+      cognitive_indicators: profileData.cognitive_indicators as unknown as InverseProfile['cognitive_indicators'],
+      metacognitive_indicators: profileData.metacognitive_indicators as unknown as InverseProfile['metacognitive_indicators'],
+      motivational_indicators: profileData.motivational_indicators as unknown as InverseProfile['motivational_indicators'],
+      behavioral_patterns: profileData.behavioral_patterns as unknown as InverseProfile['behavioral_patterns'],
+      confidence_scores: profileData.confidence_scores as unknown as InverseProfile['confidence_scores'],
     } : null
 
     // Fetch recent Socratic dialogue interactions

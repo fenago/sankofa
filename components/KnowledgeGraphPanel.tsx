@@ -26,6 +26,16 @@ import { useGraph } from "@/hooks/useGraph";
 import { mutate } from "swr";
 import { notebookKeys } from "@/hooks/useNotebooks";
 
+// Fink dimension labels
+const FINK_LABELS: Record<string, { name: string; color: string }> = {
+  foundational_knowledge: { name: 'Foundational', color: 'bg-blue-100 text-blue-700' },
+  application: { name: 'Application', color: 'bg-green-100 text-green-700' },
+  integration: { name: 'Integration', color: 'bg-purple-100 text-purple-700' },
+  human_dimension: { name: 'Human', color: 'bg-pink-100 text-pink-700' },
+  caring: { name: 'Caring', color: 'bg-red-100 text-red-700' },
+  learning_how_to_learn: { name: 'Meta-Learning', color: 'bg-amber-100 text-amber-700' },
+};
+
 interface Skill {
   id: string;
   name: string;
@@ -36,6 +46,9 @@ interface Skill {
   estimatedMinutes?: number;
   keywords?: string[];
   isThresholdConcept?: boolean;
+  // Fink's Taxonomy
+  finkDimensions?: string[];
+  finkPrimaryDimension?: string;
   // IRT 3PL parameters
   irtDifficulty?: number;
   irtDiscrimination?: number;
@@ -83,15 +96,27 @@ interface KnowledgeGraphPanelProps {
   expanded?: boolean;
 }
 
-// Colors for Bloom levels
-const bloomColors = [
-  "#f3f4f6", // 1 - Remember (gray-100)
-  "#dbeafe", // 2 - Understand (blue-100)
-  "#dcfce7", // 3 - Apply (green-100)
-  "#fef9c3", // 4 - Analyze (yellow-100)
-  "#ffedd5", // 5 - Evaluate (orange-100)
-  "#f3e8ff", // 6 - Create (purple-100)
+// Extraction granularity options
+type ExtractionGranularity = 'compact' | 'standard' | 'detailed';
+
+const GRANULARITY_OPTIONS: { value: ExtractionGranularity; label: string; description: string; range: string }[] = [
+  { value: 'compact', label: 'Compact', description: 'High-level skills only', range: '5-10 skills' },
+  { value: 'standard', label: 'Standard', description: 'Balanced coverage', range: '15-25 skills' },
+  { value: 'detailed', label: 'Detailed', description: 'Fine-grained hierarchy', range: '30-50 skills' },
 ];
+
+// Colors for Bloom levels with labels
+const bloomLevels = [
+  { level: 1, name: 'Remember', color: "#f3f4f6", border: "#d1d5db" },
+  { level: 2, name: 'Understand', color: "#dbeafe", border: "#93c5fd" },
+  { level: 3, name: 'Apply', color: "#dcfce7", border: "#86efac" },
+  { level: 4, name: 'Analyze', color: "#fef9c3", border: "#fde047" },
+  { level: 5, name: 'Evaluate', color: "#ffedd5", border: "#fdba74" },
+  { level: 6, name: 'Create', color: "#f3e8ff", border: "#d8b4fe" },
+];
+
+// Keep array for backwards compat
+const bloomColors = bloomLevels.map(b => b.color);
 
 // Entity type colors
 const entityTypeColors: Record<string, string> = {
@@ -116,6 +141,8 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities" | "metadata">("graph");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showGranularityDialog, setShowGranularityDialog] = useState(false);
+  const [selectedGranularity, setSelectedGranularity] = useState<ExtractionGranularity>('standard');
 
   // Extraction progress state
   const [extractionStartTime, setExtractionStartTime] = useState<number | null>(null);
@@ -177,7 +204,8 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   // Combine errors
   const error = extractionError || graphError;
 
-  const triggerExtraction = useCallback(async () => {
+  const triggerExtraction = useCallback(async (granularity: ExtractionGranularity = 'standard') => {
+    setShowGranularityDialog(false);
     setIsExtracting(true);
     setExtractionError(null);
     setExtractionStartTime(Date.now());
@@ -188,7 +216,7 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
       const res = await fetch(`/api/notebooks/${notebookId}/graph`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rebuild: true }),
+        body: JSON.stringify({ rebuild: true, granularity }),
       });
 
       // Handle timeout - extraction may still complete server-side
@@ -395,7 +423,7 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
           <Button
             size="sm"
             variant="outline"
-            onClick={triggerExtraction}
+            onClick={() => setShowGranularityDialog(true)}
             disabled={isExtracting}
             className="text-xs h-8 bg-black text-white hover:bg-gray-800 hover:text-white border-none"
           >
@@ -497,16 +525,44 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                   </div>
                 )}
               </div>
-              <div className="mt-2 flex gap-4 text-xs text-gray-500">
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-0.5 bg-red-500"></span> Required
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-0.5 bg-amber-500"></span> Recommended
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-0.5 bg-gray-400"></span> Helpful
-                </span>
+              {/* Comprehensive Legend */}
+              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                <div className="text-xs font-medium text-gray-700 mb-2">Legend</div>
+
+                {/* Bloom's Taxonomy - Node Colors */}
+                <div className="mb-3">
+                  <div className="text-[10px] text-gray-500 mb-1.5 font-medium">Node Color = Bloom&apos;s Taxonomy Level</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bloomLevels.map((bloom) => (
+                      <div key={bloom.level} className="flex items-center gap-1">
+                        <span
+                          className="w-4 h-4 rounded border"
+                          style={{ backgroundColor: bloom.color, borderColor: bloom.border }}
+                        />
+                        <span className="text-[10px] text-gray-600">{bloom.level}. {bloom.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Edge Types */}
+                <div>
+                  <div className="text-[10px] text-gray-500 mb-1.5 font-medium">Edge Type = Prerequisite Strength</div>
+                  <div className="flex gap-4">
+                    <span className="flex items-center gap-1">
+                      <span className="w-4 h-0.5 bg-red-500"></span>
+                      <span className="text-[10px] text-gray-600">Required</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-4 h-0.5 bg-amber-500"></span>
+                      <span className="text-[10px] text-gray-600">Recommended</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-4 h-0.5 bg-gray-400"></span>
+                      <span className="text-[10px] text-gray-600">Helpful</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -526,19 +582,44 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{skill.description}</p>
                       )}
                     </div>
-                    <div className="flex gap-1 ml-2">
+                    <div className="flex gap-1 ml-2 flex-wrap justify-end">
                       {skill.bloomLevel && (
-                        <span className="px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 rounded">
-                          L{skill.bloomLevel}
+                        <span
+                          className="px-2 py-0.5 text-[10px] font-medium rounded border"
+                          style={{
+                            backgroundColor: bloomLevels[skill.bloomLevel - 1]?.color,
+                            borderColor: bloomLevels[skill.bloomLevel - 1]?.border,
+                          }}
+                        >
+                          {bloomLevels[skill.bloomLevel - 1]?.name || `L${skill.bloomLevel}`}
                         </span>
                       )}
                       {skill.isThresholdConcept && (
-                        <span className="px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-800 rounded">
+                        <span className="px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-800 rounded border border-purple-300">
                           Threshold
                         </span>
                       )}
                     </div>
                   </div>
+
+                  {/* Fink's Taxonomy Dimensions */}
+                  {skill.finkDimensions && skill.finkDimensions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <span className="text-[10px] text-gray-400 mr-1">Fink:</span>
+                      {skill.finkDimensions.map((dim, i) => {
+                        const finkInfo = FINK_LABELS[dim];
+                        return (
+                          <span
+                            key={i}
+                            className={`px-1.5 py-0.5 text-[10px] rounded ${finkInfo?.color || 'bg-gray-100 text-gray-600'}`}
+                          >
+                            {finkInfo?.name || dim}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {skill.keywords && skill.keywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {skill.keywords.slice(0, 5).map((kw, i) => (
@@ -595,13 +676,48 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                     <div className="space-y-1">
                       <h5 className="font-medium text-gray-700">Bloom&apos;s Taxonomy</h5>
                       <div className="text-gray-600">
-                        <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded mr-1">
-                          L{skill.bloomLevel || "?"}
-                        </span>
+                        {skill.bloomLevel && (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded border mr-1"
+                            style={{
+                              backgroundColor: bloomLevels[skill.bloomLevel - 1]?.color,
+                              borderColor: bloomLevels[skill.bloomLevel - 1]?.border,
+                            }}
+                          >
+                            {skill.bloomLevel}. {bloomLevels[skill.bloomLevel - 1]?.name || "?"}
+                          </span>
+                        )}
                         {skill.secondaryBloomLevels && skill.secondaryBloomLevels.length > 0 && (
                           <span className="text-gray-400">
                             + {skill.secondaryBloomLevels.join(", ")}
                           </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fink's Taxonomy */}
+                    <div className="space-y-1">
+                      <h5 className="font-medium text-gray-700">Fink&apos;s Taxonomy</h5>
+                      <div className="text-gray-600">
+                        {skill.finkDimensions && skill.finkDimensions.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {skill.finkDimensions.map((dim, i) => {
+                              const finkInfo = FINK_LABELS[dim];
+                              const isPrimary = skill.finkPrimaryDimension === dim;
+                              return (
+                                <span
+                                  key={i}
+                                  className={`px-1.5 py-0.5 text-[10px] rounded ${finkInfo?.color || 'bg-gray-100 text-gray-600'} ${isPrimary ? 'ring-1 ring-offset-1 ring-gray-400' : ''}`}
+                                  title={isPrimary ? 'Primary dimension' : ''}
+                                >
+                                  {finkInfo?.name || dim}
+                                  {isPrimary && ' ★'}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Not specified</span>
                         )}
                       </div>
                     </div>
@@ -858,6 +974,59 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                 <Trash2 className="h-4 w-4 mr-2" />
               )}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Granularity Selection Dialog */}
+      <Dialog open={showGranularityDialog} onOpenChange={setShowGranularityDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              Extraction Settings
+            </DialogTitle>
+            <DialogDescription>
+              Choose how detailed you want the skill extraction to be
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-3">
+            {GRANULARITY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSelectedGranularity(option.value)}
+                className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                  selectedGranularity === option.value
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    {option.range}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+              </button>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowGranularityDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => triggerExtraction(selectedGranularity)}
+              className="bg-black text-white hover:bg-gray-800"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Extract
             </Button>
           </DialogFooter>
         </DialogContent>

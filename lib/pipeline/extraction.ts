@@ -11,6 +11,7 @@ import type {
   EntityRelationship,
   GraphExtractionResult,
   BloomLevel,
+  FinkDimension,
 } from '@/lib/types/graph'
 
 // Use Gemini 3 Flash for extraction (1M+ token context window)
@@ -36,37 +37,79 @@ function getClient(): GoogleGenAI {
 const MAX_EXTRACTION_CHUNK_SIZE = 150000
 
 /**
+ * Extraction Granularity Level
+ * Controls how many skills are extracted and at what detail level
+ */
+export type ExtractionGranularity = 'compact' | 'standard' | 'detailed'
+
+export interface ExtractionOptions {
+  granularity?: ExtractionGranularity
+  existingSkillNames?: string[]
+}
+
+const GRANULARITY_GUIDANCE: Record<ExtractionGranularity, string> = {
+  compact: `### GRANULARITY: COMPACT (5-10 skills)
+Extract only HIGH-LEVEL skills - major concepts and competencies.
+- Focus on big-picture understanding, not details
+- Each skill should represent a substantial learning outcome (30+ minutes)
+- Combine related micro-skills into broader competencies
+- Prefer skills at Bloom levels 3-6 (Apply, Analyze, Evaluate, Create)
+- Maximum 10 skills total`,
+
+  standard: `### GRANULARITY: STANDARD (15-25 skills)
+Extract a BALANCED set of skills at varying levels of detail.
+- Include both foundational and advanced skills
+- Each skill should be learnable in 10-30 minutes
+- Cover all major topics without excessive granularity
+- Aim for 15-25 skills depending on content complexity`,
+
+  detailed: `### GRANULARITY: DETAILED (30-50 skills)
+Extract a COMPREHENSIVE, fine-grained skill hierarchy.
+- Include micro-skills and sub-competencies
+- Each skill should be learnable in 5-15 minutes
+- Capture nuances, edge cases, and specialized knowledge
+- Include prerequisite/foundational skills even if implicit
+- Aim for 30-50 skills for thorough coverage`,
+}
+
+/**
  * Extract skills and entities from a text chunk
  */
 export async function extractFromText(
   text: string,
   notebookId: string,
   sourceDocumentId?: string,
-  existingSkillNames?: string[]
+  options?: ExtractionOptions
 ): Promise<GraphExtractionResult> {
   const ai = getClient()
+  const granularity = options?.granularity || 'standard'
+  const existingSkillNames = options?.existingSkillNames
 
   // For large texts, process in chunks and merge results
   if (text.length > MAX_EXTRACTION_CHUNK_SIZE) {
-    console.log(`[Extraction] Large text (${text.length} chars), processing in chunks`)
-    return extractFromTextChunked(text, notebookId, sourceDocumentId, existingSkillNames)
+    console.log(`[Extraction] Large text (${text.length} chars), processing in chunks with granularity: ${granularity}`)
+    return extractFromTextChunked(text, notebookId, sourceDocumentId, options)
   }
 
   const existingContext = existingSkillNames?.length
     ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
     : ''
 
-  console.log(`[Extraction] Starting extraction for ${text.length} chars`)
+  const granularityGuidance = GRANULARITY_GUIDANCE[granularity]
+
+  console.log(`[Extraction] Starting extraction for ${text.length} chars with granularity: ${granularity}`)
 
   const prompt = `You are an expert curriculum designer and learning scientist. Extract a comprehensive, research-grounded knowledge graph from this educational content.
 
 ## CRITICAL REQUIREMENTS
 
-### 1. QUALITY OVER QUANTITY
+${granularityGuidance}
+
+### SKILL QUALITY STANDARDS
 Extract skills based on what the content actually teaches. Each skill must be:
-- Learnable in 5-30 minutes
 - Testable with 3-5 questions
 - Atomic (cannot be broken down further without losing meaning)
+- Clearly named and described
 
 ### 2. SOURCE-FIRST + COMMON SENSE
 - PRIMARY: Extract skills directly from the source content
@@ -93,7 +136,7 @@ If a skill has no connections, either:
 
 ## EDUCATIONAL PSYCHOLOGY FRAMEWORKS TO APPLY
 
-### 1. Bloom's Taxonomy (Revised 2001)
+### 1. Bloom's Taxonomy (Revised 2001) - COGNITIVE hierarchy
 - Level 1 (Remember): Recall facts, terms, basic concepts
 - Level 2 (Understand): Explain ideas, interpret meaning
 - Level 3 (Apply): Use knowledge in new situations
@@ -101,26 +144,40 @@ If a skill has no connections, either:
 - Level 5 (Evaluate): Justify decisions, critique
 - Level 6 (Create): Produce new work, design solutions
 
-### 2. Item Response Theory (IRT) - 3PL Model
+### 2. Fink's Taxonomy of Significant Learning (2003) - HOLISTIC dimensions
+Non-hierarchical, interactive dimensions that enhance each other. A skill can address MULTIPLE dimensions:
+- **foundational_knowledge**: Understanding and remembering information and ideas
+- **application**: Skills, thinking critically, creativity, managing projects
+- **integration**: Connecting ideas, people, and realms of life (cross-disciplinary)
+- **human_dimension**: Learning about oneself and others (self-awareness, empathy)
+- **caring**: Developing new feelings, interests, or values (motivation, ethics)
+- **learning_how_to_learn**: Becoming a better, self-directed learner (metacognition)
+
+Examples:
+- "Evaluate experimental design" → [foundational_knowledge, application, integration]
+- "Reflect on personal learning strategies" → [learning_how_to_learn, human_dimension]
+- "Develop ethical research practices" → [caring, human_dimension, application]
+
+### 3. Item Response Theory (IRT) - 3PL Model
 - Difficulty (b): -3 (very easy) to +3 (very hard), 0 = average
 - Discrimination (a): 0.5 (poor) to 2.5 (excellent)
 - Guessing (c): 0 to 0.5 - probability of correct guess
 
-### 3. Threshold Concepts (Meyer & Land)
+### 4. Threshold Concepts (Meyer & Land)
 Identify transformative, irreversible, integrative knowledge that may be troublesome.
 
-### 4. Cognitive Load Theory (Sweller)
+### 5. Cognitive Load Theory (Sweller)
 - Cognitive load: low/medium/high
 - Chunks required: working memory slots (2-7)
 - Element interactivity: low/medium/high
 
-### 5. Instructional Scaffolding (Vygotsky/Wood)
+### 6. Instructional Scaffolding (Vygotsky/Wood)
 - Level 1: Full worked examples
 - Level 2: Partial solutions
 - Level 3: Hints on request
 - Level 4: Independent practice
 
-### 6. Mastery Learning (Bloom)
+### 7. Mastery Learning (Bloom)
 - Mastery threshold: 0.80 standard, 0.90 for threshold concepts
 
 ## PREREQUISITE RELATIONSHIPS - ENSURE FULL CONNECTIVITY
@@ -150,6 +207,11 @@ ${text}
       "description": "1-2 sentences: what will the learner know/be able to do?",
       "bloomLevel": 1-6,
       "secondaryBloomLevels": [optional additional levels if skill spans multiple],
+      "finkDimensions": ["foundational_knowledge", "application", ...],
+      "finkPrimaryDimension": "most prominent dimension for this skill",
+      "finkIntegrations": [
+        { "fromDimension": "application", "toDimension": "integration", "description": "how skill connects these" }
+      ],
       "estimatedMinutes": 5-45,
       "difficulty": 1-10,
       "irt": {
@@ -237,7 +299,7 @@ Before returning, verify:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.3, // Slightly higher for thoughtful additions
+        temperature: 0.1, // Low temperature for consistent, deterministic extraction
       },
     })
     console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
@@ -280,6 +342,14 @@ Before returning, verify:
     notebookId,
     bloomLevel: validateBloomLevel(s.bloomLevel),
     secondaryBloomLevels: s.secondaryBloomLevels?.map(validateBloomLevel),
+    // Fink's Taxonomy of Significant Learning
+    finkDimensions: validateFinkDimensions(s.finkDimensions),
+    finkPrimaryDimension: s.finkPrimaryDimension ? validateFinkDimension(s.finkPrimaryDimension) ?? undefined : undefined,
+    finkIntegrations: s.finkIntegrations?.map(fi => ({
+      fromDimension: validateFinkDimension(fi.fromDimension) ?? 'foundational_knowledge' as FinkDimension,
+      toDimension: validateFinkDimension(fi.toDimension) ?? 'application' as FinkDimension,
+      description: fi.description,
+    })).filter(fi => fi.fromDimension !== fi.toDimension),
     estimatedMinutes: s.estimatedMinutes ? Math.min(120, Math.max(5, s.estimatedMinutes)) : 30,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
     // IRT 3PL model parameters
@@ -382,8 +452,10 @@ async function extractFromTextChunked(
   text: string,
   notebookId: string,
   sourceDocumentId?: string,
-  existingSkillNames?: string[]
+  options?: ExtractionOptions
 ): Promise<GraphExtractionResult> {
+  const existingSkillNames = options?.existingSkillNames
+  const granularity = options?.granularity || 'standard'
   // Split text into chunks at paragraph boundaries
   const chunks: string[] = []
   let currentChunk = ''
@@ -406,12 +478,12 @@ async function extractFromTextChunked(
   // Process ALL chunks in parallel for speed
   const startTime = Date.now()
   const chunkPromises = chunks.map((chunk, i) => {
-    console.log(`[Extraction] Starting chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`)
+    console.log(`[Extraction] Starting chunk ${i + 1}/${chunks.length} (${chunk.length} chars) with granularity: ${granularity}`)
     return extractFromTextDirect(
       chunk,
       notebookId,
       sourceDocumentId,
-      existingSkillNames // Pass original existing skills to all chunks
+      { existingSkillNames, granularity } // Pass options to all chunks
     ).catch(error => {
       console.error(`[Extraction] Chunk ${i + 1} failed:`, error)
       return null // Return null for failed chunks, continue with others
@@ -477,9 +549,12 @@ async function extractFromTextDirect(
   text: string,
   notebookId: string,
   sourceDocumentId?: string,
-  existingSkillNames?: string[]
+  options?: ExtractionOptions
 ): Promise<GraphExtractionResult> {
   const ai = getClient()
+  const existingSkillNames = options?.existingSkillNames
+  const granularity = options?.granularity || 'standard'
+  const granularityGuidance = GRANULARITY_GUIDANCE[granularity]
 
   const existingContext = existingSkillNames?.length
     ? `\n\nExisting skills already extracted (create PREREQUISITE relationships to these where appropriate):\n${existingSkillNames.join(', ')}`
@@ -489,15 +564,17 @@ async function extractFromTextDirect(
 
 ## CRITICAL REQUIREMENTS
 
-### 1. QUALITY OVER QUANTITY
-- Extract skills based on what the content actually teaches
-- Each skill should be learnable in 5-30 minutes, testable with 3-5 questions
+${granularityGuidance}
 
-### 2. SOURCE-FIRST + COMMON SENSE
+### SKILL QUALITY
+- Extract skills based on what the content actually teaches
+- Each skill should be testable with 3-5 questions
+
+### SOURCE-FIRST + COMMON SENSE
 - PRIMARY: Skills from the source content
 - SECONDARY: Add obvious prerequisite skills that are logically necessary
 
-### 3. FULLY CONNECTED - NO ORPHANS
+### FULLY CONNECTED - NO ORPHANS
 **EVERY skill must connect to at least one other skill.** Zero isolated nodes.
 ${existingContext}
 
@@ -555,10 +632,10 @@ Respond with JSON:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.3,
+        temperature: 0.1, // Low temperature for consistent, deterministic extraction
       },
     })
-    console.log(`[Extraction] Gemini API call completed in ${Date.now() - startTime}ms`)
+    console.log(`[Extraction] Gemini API call (granularity: ${granularity}) completed in ${Date.now() - startTime}ms`)
   } catch (apiError) {
     console.error('[Extraction] Gemini API call failed:', apiError)
     throw new Error(`Gemini API failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`)
@@ -592,6 +669,9 @@ Respond with JSON:
     description: s.description,
     notebookId,
     bloomLevel: validateBloomLevel(s.bloomLevel),
+    // Fink's Taxonomy (basic extraction for chunked processing)
+    finkDimensions: validateFinkDimensions(s.finkDimensions),
+    finkPrimaryDimension: s.finkPrimaryDimension ? validateFinkDimension(s.finkPrimaryDimension) ?? undefined : undefined,
     estimatedMinutes: s.estimatedMinutes ? Math.min(120, Math.max(5, s.estimatedMinutes)) : 30,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
     isThresholdConcept: s.isThresholdConcept || false,
@@ -737,7 +817,7 @@ Respond with JSON:
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        temperature: 0.3,
+        temperature: 0.1, // Low temperature for consistent prerequisite inference
       },
     })
     console.log(`[Extraction] Prerequisite inference completed in ${Date.now() - startTime}ms`)
@@ -878,7 +958,7 @@ function deduplicatePrerequisites(prereqs: PrerequisiteRelationship[]): Prerequi
 export async function batchExtractFromTexts(
   texts: { content: string; sourceId?: string }[],
   notebookId: string,
-  existingSkillNames?: string[]
+  options?: ExtractionOptions
 ): Promise<GraphExtractionResult> {
   const allResults: GraphExtractionResult = {
     skills: [],
@@ -888,8 +968,11 @@ export async function batchExtractFromTexts(
     existingSkillReferences: [],
   }
 
+  const granularity = options?.granularity || 'standard'
+  console.log(`[Extraction] Batch extraction with granularity: ${granularity}`)
+
   // Track skills across chunks to build cross-chunk prerequisites
-  const accumulatedSkillNames: string[] = [...(existingSkillNames || [])]
+  const accumulatedSkillNames: string[] = [...(options?.existingSkillNames || [])]
 
   for (const { content, sourceId } of texts) {
     try {
@@ -897,7 +980,7 @@ export async function batchExtractFromTexts(
         content,
         notebookId,
         sourceId,
-        accumulatedSkillNames
+        { existingSkillNames: accumulatedSkillNames, granularity }
       )
 
       allResults.skills.push(...result.skills)
@@ -1016,6 +1099,14 @@ interface RawSkill {
   description: string
   bloomLevel: number
   secondaryBloomLevels?: number[]
+  // Fink's Taxonomy of Significant Learning
+  finkDimensions?: string[]
+  finkPrimaryDimension?: string
+  finkIntegrations?: {
+    fromDimension: string
+    toDimension: string
+    description: string
+  }[]
   estimatedMinutes?: number
   difficulty?: number
   irt?: {
@@ -1076,6 +1167,33 @@ interface RawEntityRelationship {
 function validateBloomLevel(level: number): BloomLevel {
   const clamped = Math.min(6, Math.max(1, Math.round(level)))
   return clamped as BloomLevel
+}
+
+// Valid Fink dimensions
+const VALID_FINK_DIMENSIONS: FinkDimension[] = [
+  'foundational_knowledge',
+  'application',
+  'integration',
+  'human_dimension',
+  'caring',
+  'learning_how_to_learn',
+]
+
+// Validate Fink dimension
+function validateFinkDimension(dimension: string): FinkDimension | null {
+  const normalized = dimension.toLowerCase().trim().replace(/\s+/g, '_')
+  if (VALID_FINK_DIMENSIONS.includes(normalized as FinkDimension)) {
+    return normalized as FinkDimension
+  }
+  return null
+}
+
+// Validate array of Fink dimensions
+function validateFinkDimensions(dimensions: string[] | undefined): FinkDimension[] {
+  if (!dimensions || !Array.isArray(dimensions)) return []
+  return dimensions
+    .map(validateFinkDimension)
+    .filter((d): d is FinkDimension => d !== null)
 }
 
 // Cosine similarity for embeddings
@@ -1182,6 +1300,9 @@ Respond with JSON:
     description: s.description || '',
     notebookId,
     bloomLevel: validateBloomLevel(s.bloomLevel || 2),
+    // Fink's Taxonomy (minimal for fast extraction)
+    finkDimensions: validateFinkDimensions(s.finkDimensions),
+    finkPrimaryDimension: s.finkPrimaryDimension ? validateFinkDimension(s.finkPrimaryDimension) ?? undefined : undefined,
     estimatedMinutes: 30,
     difficulty: Math.min(10, Math.max(1, s.difficulty || 5)),
     isThresholdConcept: s.isThresholdConcept || false,

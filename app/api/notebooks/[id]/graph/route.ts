@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable, ensureIndexes } from '@/lib/graph/neo4j'
 import { getSkillGraph, getEntitiesByNotebook, storeGraphExtraction, deleteNotebookGraph } from '@/lib/graph/store'
-import { extractFromText, batchExtractFromTexts } from '@/lib/pipeline/extraction'
+import { extractFromText, batchExtractFromTexts, type ExtractionGranularity } from '@/lib/pipeline/extraction'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -106,7 +106,14 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Get request body
     const body = await request.json()
-    const { sourceId, text, rebuild = false } = body
+    const { sourceId, text, rebuild = false, granularity = 'standard' } = body as {
+      sourceId?: string
+      text?: string
+      rebuild?: boolean
+      granularity?: ExtractionGranularity
+    }
+
+    console.log(`[Graph] Extraction requested with granularity: ${granularity}`)
 
     // If rebuild requested, clear existing graph data
     if (rebuild) {
@@ -115,7 +122,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // If text is provided directly, extract from it
     if (text) {
-      const result = await extractFromText(text, notebookId, sourceId)
+      const result = await extractFromText(text, notebookId, sourceId, { granularity })
       await storeGraphExtraction(result)
       return NextResponse.json({
         success: true,
@@ -165,11 +172,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Extract from all sources
     const texts = textsToExtract
 
-    const result = await batchExtractFromTexts(texts, notebookId)
+    const result = await batchExtractFromTexts(texts, notebookId, { granularity })
     await storeGraphExtraction(result)
 
     return NextResponse.json({
       success: true,
+      granularity,
       skills: result.skills.length,
       entities: result.entities.length,
       prerequisites: result.prerequisites.length,
