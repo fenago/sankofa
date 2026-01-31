@@ -38,9 +38,16 @@ export default function DashboardLayout({
               <span className="text-[10px] text-muted-foreground leading-tight">by DrLee.AI</span>
             </div>
             <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-mono font-medium">
-              v0.4.0
+              v0.5.0
             </span>
           </Link>
+
+          {/* Dr. Lee Logo */}
+          <img
+            src="/drleeLogo.webp"
+            alt="Dr. Lee"
+            className="h-8 opacity-70 hover:opacity-100 transition-opacity hidden sm:block"
+          />
 
           <div className="flex-1" />
 
