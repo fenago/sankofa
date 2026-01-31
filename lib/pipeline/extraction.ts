@@ -581,6 +581,15 @@ ${existingContext}
 TEXT TO ANALYZE:
 ${text}
 
+### FINK'S TAXONOMY (apply to each skill)
+Assign dimensions that this skill addresses:
+- foundational_knowledge: Understanding and remembering information
+- application: Skills, critical thinking, creativity
+- integration: Connecting ideas across domains
+- human_dimension: Learning about oneself and others
+- caring: Developing feelings, interests, values
+- learning_how_to_learn: Metacognition, self-directed learning
+
 Respond with JSON:
 {
   "skills": [
@@ -588,6 +597,8 @@ Respond with JSON:
       "name": "string (unique, descriptive)",
       "description": "string (1-2 sentences)",
       "bloomLevel": 1-6,
+      "finkDimensions": ["foundational_knowledge", "application", ...],
+      "finkPrimaryDimension": "the most prominent dimension",
       "estimatedMinutes": 5-30,
       "difficulty": 1-10,
       "isThresholdConcept": boolean,
