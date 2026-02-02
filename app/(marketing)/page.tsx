@@ -23,7 +23,16 @@ import {
   AlertTriangle,
   Baby,
   School,
-  UserCheck
+  UserCheck,
+  Upload,
+  Database,
+  Route,
+  MessageSquare,
+  BarChart3,
+  ArrowDown,
+  Play,
+  CircleDot,
+  Workflow
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,6 +55,7 @@ export default function LandingPage() {
               <Badge variant="outline" className="ml-2 text-xs">Beta</Badge>
             </div>
             <div className="hidden md:flex items-center gap-8">
+              <Link href="#how-it-works" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">How It Works</Link>
               <Link href="#matrix" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">The Matrix</Link>
               <Link href="#fink" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Fink's Framework</Link>
               <Link href="#readiness" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">When Ready</Link>
@@ -257,8 +267,204 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* How It Works - Two-Sided Architecture */}
+      <section id="how-it-works" className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-emerald-100 text-emerald-700">Simple Yet Powerful</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              How It Works: Two Sides, One Goal
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Like NotebookLM, you start by uploading your content. Unlike NotebookLM, we extract
+              <em> educational structure</em>—then use it to <em>scaffold real learning</em>.
+            </p>
+          </div>
+
+          {/* Illustrated Infographic */}
+          <div className="max-w-6xl mx-auto mb-16">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 border shadow-lg overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-center gap-4 mb-8">
+                <div className="h-px bg-gradient-to-r from-transparent via-purple-300 to-purple-500 w-24"></div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border">
+                  <Workflow className="h-5 w-5 text-purple-600" />
+                  <span className="font-semibold text-gray-700">The LearnGraph Pipeline</span>
+                </div>
+                <div className="h-px bg-gradient-to-r from-blue-500 via-blue-300 to-transparent w-24"></div>
+              </div>
+
+              {/* Two Columns */}
+              <div className="grid lg:grid-cols-2 gap-8">
+                {/* Content Side */}
+                <div className="relative">
+                  <div className="absolute -top-2 -left-2 w-20 h-20 bg-purple-200/50 rounded-full blur-xl"></div>
+                  <div className="relative bg-white rounded-2xl p-6 border-2 border-purple-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-purple-100">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
+                        <Upload className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-purple-900">Content Side</h3>
+                        <p className="text-sm text-purple-600">For Educators & Content Creators</p>
+                      </div>
+                    </div>
+
+                    {/* Steps */}
+                    <div className="space-y-4">
+                      {[
+                        { icon: FileText, label: 'Load Documents', desc: 'PDFs, slides, videos, websites—any learning material', color: 'purple' },
+                        { icon: Database, label: 'Vectorize Content', desc: 'RAG-ready embeddings as factual guardrails', color: 'purple' },
+                        { icon: Target, label: 'Align to Standards', desc: 'Map to learning objectives, competencies, or standards', color: 'purple' },
+                        { icon: Network, label: 'Extract Skills', desc: 'AI identifies skills with prerequisite relationships', color: 'purple' },
+                        { icon: Layers, label: 'Tag with Metadata', desc: 'Bloom, Fink, IRT, cognitive load—29 frameworks', color: 'purple' },
+                        { icon: Route, label: 'Generate Curriculum', desc: 'Auto-create lesson plans, assessments, learning paths', color: 'purple' },
+                      ].map((step, i) => (
+                        <div key={i} className="relative">
+                          <div className="flex items-start gap-3">
+                            <div className="relative">
+                              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
+                                <step.icon className="h-5 w-5 text-purple-600" />
+                              </div>
+                              {i < 5 && (
+                                <div className="absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-4 bg-gradient-to-b from-purple-300 to-purple-100"></div>
+                              )}
+                            </div>
+                            <div className="flex-1 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-purple-500">0{i + 1}</span>
+                                <span className="font-semibold text-gray-900 text-sm">{step.label}</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">{step.desc}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Output */}
+                    <div className="mt-6 pt-4 border-t border-purple-100">
+                      <div className="flex items-center gap-2 text-sm text-purple-700 font-medium">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Output: Structured Knowledge Graph
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Learning Side */}
+                <div className="relative">
+                  <div className="absolute -top-2 -right-2 w-20 h-20 bg-blue-200/50 rounded-full blur-xl"></div>
+                  <div className="relative bg-white rounded-2xl p-6 border-2 border-blue-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-blue-100">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                        <Brain className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-blue-900">Learning Side</h3>
+                        <p className="text-sm text-blue-600">For Learners & Tutoring</p>
+                      </div>
+                    </div>
+
+                    {/* Steps */}
+                    <div className="space-y-4">
+                      {[
+                        { icon: Target, label: 'Goal-Oriented Notebook', desc: 'Every session tied to specific learning objectives', color: 'blue' },
+                        { icon: Network, label: 'Graph RAG', desc: 'Answers grounded in skill relationships, not just text', color: 'blue' },
+                        { icon: Users, label: 'Inverse Profiling', desc: 'Real-time learner model across all Fink dimensions', color: 'blue' },
+                        { icon: BarChart3, label: 'Progress Tracking', desc: 'BKT mastery, SM-2 review, ZPD positioning', color: 'blue' },
+                        { icon: Zap, label: 'Adaptive Scaffolding', desc: 'Hints before answers, fading as competence grows', color: 'blue' },
+                        { icon: MessageSquare, label: 'Socratic Tutoring', desc: 'Real-time response analysis, freeform conversation', color: 'blue' },
+                      ].map((step, i) => (
+                        <div key={i} className="relative">
+                          <div className="flex items-start gap-3">
+                            <div className="relative">
+                              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                                <step.icon className="h-5 w-5 text-blue-600" />
+                              </div>
+                              {i < 5 && (
+                                <div className="absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-4 bg-gradient-to-b from-blue-300 to-blue-100"></div>
+                              )}
+                            </div>
+                            <div className="flex-1 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-blue-500">0{i + 1}</span>
+                                <span className="font-semibold text-gray-900 text-sm">{step.label}</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">{step.desc}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Output */}
+                    <div className="mt-6 pt-4 border-t border-blue-100">
+                      <div className="flex items-center gap-2 text-sm text-blue-700 font-medium">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Output: Learner Who Learns How to Learn
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Center Connection */}
+              <div className="flex items-center justify-center mt-8">
+                <div className="flex items-center gap-4 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-white shadow-lg">
+                  <CircleDot className="h-5 w-5" />
+                  <span className="font-semibold">One goal: Build capability, not dependency</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature Highlights */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                  <Shield className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold mb-2 text-purple-900">Guardrailed by Your Content</h3>
+                <p className="text-sm text-gray-600">
+                  Vector embeddings ensure AI responses stay grounded in your source material—no hallucinations,
+                  no off-topic drift.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+                  <Brain className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold mb-2 text-blue-900">Learns About the Learner</h3>
+                <p className="text-sm text-gray-600">
+                  Every interaction updates the inverse profile—mastery estimates, cognitive load, metacognitive
+                  calibration, and Fink dimension progress.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4">
+                  <TrendingUp className="h-6 w-6 text-emerald-600" />
+                </div>
+                <h3 className="font-semibold mb-2 text-emerald-900">Scaffolds to Independence</h3>
+                <p className="text-sm text-gray-600">
+                  As mastery grows, support fades. The goal: make the learner <em>more capable</em> of learning
+                  without AI, not dependent on it.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Fink's Taxonomy Section - PRIMARY EMPHASIS */}
-      <section id="fink" className="py-20">
+      <section id="fink" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-purple-100 text-purple-700">The Heart of LearnGraph</Badge>

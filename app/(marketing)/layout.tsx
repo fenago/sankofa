@@ -1,24 +1,34 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'LearnGraph - AI-Powered Learning Paths Built on Educational Psychology',
-  description: 'Transform any content into personalized mastery paths using 29 research-backed educational psychology frameworks. NotebookLM for educators.',
+  title: 'LearnGraph - Teaching Students to Learn How to Learn',
+  description: 'AI-powered significant learning that separates skills from content. Built on Fink\'s Taxonomy and 29 educational psychology frameworks. The goal: build learners who become more capable, not more dependent.',
   keywords: [
     'AI learning',
     'educational psychology',
+    'Fink\'s Taxonomy',
+    'Learning How to Learn',
     'Bloom\'s taxonomy',
     'knowledge graphs',
-    'personalized learning',
+    'significant learning',
     'mastery-based learning',
     'Zone of Proximal Development',
     'Bayesian Knowledge Tracing',
     'adaptive learning',
-    'NotebookLM alternative',
+    'metacognition',
+    'scaffolding',
+    'skill-content separation',
   ],
   openGraph: {
-    title: 'LearnGraph - AI-Powered Learning Paths',
-    description: 'Transform content into mastery paths using 29 educational psychology frameworks.',
+    title: 'LearnGraph - Teaching Students to Learn How to Learn',
+    description: 'AI that builds capability, not dependency. Separate skills from content. Transform any material into significant learning using Fink\'s Taxonomy and 29 ed psych frameworks.',
     type: 'website',
+    siteName: 'LearnGraph',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LearnGraph - Teaching Students to Learn How to Learn',
+    description: 'AI that builds capability, not dependency. Built on Fink\'s Taxonomy of Significant Learning.',
   },
 }
 
