@@ -258,6 +258,17 @@ const modernTBDFrameworks = [
 
 const whitepapers = [
   {
+    title: "Bloom + Fink Combined Framework",
+    description: "How we layer Fink's holistic dimensions over Bloom's cognitive hierarchy to create multi-dimensional learning objectives that transform learners",
+    path: "/docs/LearnGraph_Bloom_Fink_Combined_Framework.md",
+    slug: "bloom-fink-combined-framework",
+    icon: Layers,
+    pages: "~25 pages",
+    readTime: "20 min",
+    color: "purple" as const,
+    isNew: true,
+  },
+  {
     title: "Inverse Profiling Whitepaper",
     description: "Comprehensive technical documentation of the Inverse Profiling system including BKT, ZPD, scaffolding, and real-time adaptation",
     path: "/docs/LearnGraph_Inverse_Profiling_Whitepaper.md",
@@ -265,16 +276,6 @@ const whitepapers = [
     icon: Brain,
     pages: "~50 pages",
     readTime: "45 min",
-    color: "purple" as const,
-  },
-  {
-    title: "Competitive Positioning",
-    description: "Market analysis, competitive landscape, unique value propositions, and go-to-market strategy",
-    path: "/docs/LearnGraph_Competitive_Positioning.md",
-    slug: "competitive-positioning",
-    icon: TrendingUp,
-    pages: "~30 pages",
-    readTime: "25 min",
     color: "blue" as const,
   },
   {
@@ -288,6 +289,16 @@ const whitepapers = [
     color: "green" as const,
   },
   {
+    title: "Competitive Positioning",
+    description: "Market analysis, competitive landscape, unique value propositions, and go-to-market strategy",
+    path: "/docs/LearnGraph_Competitive_Positioning.md",
+    slug: "competitive-positioning",
+    icon: TrendingUp,
+    pages: "~30 pages",
+    readTime: "25 min",
+    color: "orange" as const,
+  },
+  {
     title: "Theory Overview",
     description: "Quick reference guide to all 29 educational psychology frameworks (21 implemented + 8 TBD)",
     path: "/docs/learngraph_theory.md",
@@ -295,7 +306,7 @@ const whitepapers = [
     icon: FileText,
     pages: "~15 pages",
     readTime: "15 min",
-    color: "orange" as const,
+    color: "cyan" as const,
   },
 ]
 
@@ -376,7 +387,7 @@ export default function ResearchPage() {
           </Card>
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-purple-600">4</div>
+              <div className="text-3xl font-bold text-purple-600">5</div>
               <div className="text-sm text-gray-500">Whitepapers</div>
             </CardContent>
           </Card>
@@ -396,7 +407,9 @@ export default function ResearchPage() {
                 blue: { bg: 'bg-blue-100', text: 'text-blue-700', gradient: 'from-blue-500 to-blue-700', border: 'hover:border-blue-300' },
                 green: { bg: 'bg-green-100', text: 'text-green-700', gradient: 'from-green-500 to-green-700', border: 'hover:border-green-300' },
                 orange: { bg: 'bg-orange-100', text: 'text-orange-700', gradient: 'from-orange-500 to-orange-700', border: 'hover:border-orange-300' },
+                cyan: { bg: 'bg-cyan-100', text: 'text-cyan-700', gradient: 'from-cyan-500 to-cyan-700', border: 'hover:border-cyan-300' },
               }[paper.color]
+              const isNew = 'isNew' in paper && paper.isNew
               return (
                 <Link key={paper.title} href={`/research/docs/${paper.slug}`}>
                   <Card className={`group hover:shadow-lg transition-all duration-300 cursor-pointer ${colorStyles.border} h-full overflow-hidden`}>
@@ -407,7 +420,10 @@ export default function ResearchPage() {
                           <Icon className={`h-6 w-6 ${colorStyles.text}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">{paper.title}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">{paper.title}</h3>
+                            {isNew && <Badge className="bg-purple-100 text-purple-700 text-xs">New</Badge>}
+                          </div>
                           <p className="text-sm text-gray-500 mt-1.5 line-clamp-2">{paper.description}</p>
                           <div className="flex items-center gap-3 mt-3">
                             <Badge variant="outline" className="text-xs font-medium">{paper.pages}</Badge>
