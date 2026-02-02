@@ -15,14 +15,15 @@ import {
   TrendingUp,
   Users,
   FileText,
-  Play,
   Zap,
-  BarChart3,
   Clock,
   Shield,
-  Eye,
-  MessageCircle,
-  GitBranch
+  GitBranch,
+  Compass,
+  AlertTriangle,
+  Baby,
+  School,
+  UserCheck
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,10 +46,10 @@ export default function LandingPage() {
               <Badge variant="outline" className="ml-2 text-xs">Beta</Badge>
             </div>
             <div className="hidden md:flex items-center gap-8">
-              <Link href="#features" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
-              <Link href="#research" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Research</Link>
+              <Link href="#matrix" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">The Matrix</Link>
+              <Link href="#fink" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Fink's Framework</Link>
+              <Link href="#readiness" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">When Ready</Link>
               <Link href="#whitepapers" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Whitepapers</Link>
-              <Link href="/research" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Documentation</Link>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="ghost" asChild>
@@ -62,42 +63,72 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - Skill-Content Separation */}
       <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-purple-100 text-purple-700 hover:bg-purple-100">
               <Sparkles className="h-3 w-3 mr-1" />
-              NotebookLM meets Educational Psychology
+              Beyond NotebookLM: Education Reimagined
             </Badge>
 
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
               <span className="bg-gradient-to-r from-gray-900 via-purple-900 to-gray-900 bg-clip-text text-transparent">
-                Transform Content Into
+                Separate What You Learn
               </span>
               <br />
               <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Mastery Paths
+                From How You Demonstrate It
               </span>
             </h1>
 
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-              The first AI-powered learning platform that combines knowledge graphs with
-              <span className="font-semibold text-gray-900"> 29 research-backed educational psychology frameworks</span>—including
-              Bloom's Taxonomy, Zone of Proximal Development, and Bayesian Knowledge Tracing.
+            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+              We often conflate <span className="font-semibold text-purple-700">content</span> (domain knowledge) with
+              <span className="font-semibold text-blue-700"> skills</span> (cognitive processes). LearnGraph separates them—creating
+              a powerful matrix that transforms how we teach, learn, and <em>learn how to learn</em>.
             </p>
+
+            {/* The Matrix Visual */}
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-6 mb-8 max-w-2xl mx-auto border border-purple-100">
+              <div className="grid grid-cols-2 gap-4 text-left">
+                <div className="p-4 bg-white rounded-xl shadow-sm border-l-4 border-purple-500">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BookOpen className="h-5 w-5 text-purple-600" />
+                    <span className="font-semibold text-purple-900">Content Dimension</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    <strong>What</strong> you learn—domain knowledge, facts, concepts, principles
+                  </p>
+                </div>
+                <div className="p-4 bg-white rounded-xl shadow-sm border-l-4 border-blue-500">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Brain className="h-5 w-5 text-blue-600" />
+                    <span className="font-semibold text-blue-900">Skill Dimension</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    <strong>How</strong> you demonstrate learning—cognitive processes, thinking patterns
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-white/80 rounded-lg text-center">
+                <span className="text-sm text-gray-700">
+                  Together, they create <strong className="text-purple-700">Significant Learning</strong>—where you don't just know more,
+                  you <em>become</em> a better learner.
+                </span>
+              </div>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
               <Button size="lg" asChild className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6">
                 <Link href="/signup">
-                  Start Building Learning Paths
+                  Start Learning How to Learn
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="text-lg px-8 py-6">
-                <Link href="#whitepapers">
-                  <FileText className="mr-2 h-5 w-5" />
-                  Read the Research
+                <Link href="#fink">
+                  <Layers className="mr-2 h-5 w-5" />
+                  Explore Fink's Framework
                 </Link>
               </Button>
             </div>
@@ -110,223 +141,505 @@ export default function LandingPage() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span>Peer-Reviewed Research</span>
+                <span>Fink's Significant Learning</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span>Privacy-First Design</span>
+                <span>Developmentally Appropriate</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Problem/Solution Section */}
-      <section className="py-20 bg-gray-50">
+      {/* The Skill-Content Matrix Section */}
+      <section id="matrix" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
+            <Badge className="mb-4 bg-purple-100 text-purple-700">The Core Innovation</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              NotebookLM is Amazing. But It's Not Built for <span className="text-purple-600">Educators</span>.
+              The Skill-Content Separation Principle
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Google's NotebookLM transforms how we interact with content. But it treats all learning the same—
-              missing the pedagogical structure that makes education effective.
+              Traditional education conflates <em>what</em> students learn with <em>how</em> they show they've learned it.
+              This conflation creates blind spots that limit both teaching and learning.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* NotebookLM Column */}
-            <Card className="border-2 border-gray-200">
-              <CardHeader className="bg-gray-50 border-b">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-gray-600" />
+          {/* Matrix Visualization */}
+          <div className="max-w-4xl mx-auto mb-12">
+            <div className="bg-white rounded-2xl shadow-lg border overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
+                <h3 className="text-lg font-semibold text-center">The Learning Matrix</h3>
+              </div>
+              <div className="p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="p-3 text-left bg-gray-50"></th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Remember</th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Understand</th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Apply</th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Analyze</th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Evaluate</th>
+                        <th className="p-3 text-center bg-purple-50 text-purple-700">Create</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { content: 'Photosynthesis', levels: ['Define', 'Explain', 'Calculate', 'Compare', 'Critique', 'Design'] },
+                        { content: 'World War II', levels: ['List', 'Summarize', 'Demonstrate', 'Examine', 'Judge', 'Construct'] },
+                        { content: 'Python Loops', levels: ['Recall', 'Describe', 'Implement', 'Debug', 'Optimize', 'Architect'] },
+                      ].map((row, i) => (
+                        <tr key={i} className="border-b">
+                          <td className="p-3 font-medium bg-blue-50 text-blue-700">{row.content}</td>
+                          {row.levels.map((level, j) => (
+                            <td key={j} className="p-3 text-center text-gray-600 text-xs">{level}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 flex items-center justify-center gap-8 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                    <span className="text-gray-600">Content (rows) = Domain Knowledge</span>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">Generic AI Notebooks</CardTitle>
-                    <CardDescription>Great for research, not for teaching</CardDescription>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                    <span className="text-gray-600">Skills (columns) = Cognitive Processes</span>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <Card>
               <CardContent className="pt-6">
-                <ul className="space-y-4">
-                  {[
-                    'Summarizes content without structure',
-                    'No prerequisite mapping',
-                    'No mastery tracking',
-                    'No Zone of Proximal Development',
-                    'Same content for every learner',
-                    'No scaffolding progression',
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3 text-gray-600">
-                      <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-xs text-gray-400">—</span>
-                      </div>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-4">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="font-semibold mb-2">The Problem</h3>
+                <p className="text-sm text-gray-600">
+                  A student who can "explain photosynthesis" (Understand) might not be able to "design an experiment" (Create).
+                  Traditional assessments miss this gap.
+                </p>
               </CardContent>
             </Card>
-
-            {/* LearnGraph Column */}
-            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
-              <CardHeader className="bg-gradient-to-r from-purple-100 to-blue-100 border-b border-purple-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-                    <Network className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">LearnGraph</CardTitle>
-                    <CardDescription>Built on educational psychology</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
+            <Card>
               <CardContent className="pt-6">
-                <ul className="space-y-4">
-                  {[
-                    { text: 'Extracts skills with Bloom\'s cognitive levels', icon: GraduationCap },
-                    { text: 'Maps prerequisites automatically', icon: GitBranch },
-                    { text: 'Tracks mastery with Bayesian Knowledge Tracing', icon: Target },
-                    { text: 'Identifies Zone of Proximal Development', icon: TrendingUp },
-                    { text: 'Personalizes based on learner profile', icon: Users },
-                    { text: 'Adapts scaffolding (L1→L4) dynamically', icon: Layers },
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3 text-gray-700">
-                      <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <item.icon className="h-3 w-3 text-purple-600" />
-                      </div>
-                      {item.text}
-                    </li>
-                  ))}
-                </ul>
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+                  <Target className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold mb-2">The Solution</h3>
+                <p className="text-sm text-gray-600">
+                  LearnGraph extracts <em>both</em> dimensions from your content, mapping exactly which skills
+                  apply to which knowledge—and tracking mastery of each cell.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                  <Compass className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold mb-2">The Outcome</h3>
+                <p className="text-sm text-gray-600">
+                  Precise diagnosis, targeted instruction, and most importantly: students who learn
+                  <em>how to learn</em>—not just what to know.
+                </p>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
 
-      {/* Bloom + Fink Section */}
-      <section id="features" className="py-20">
+      {/* Fink's Taxonomy Section - PRIMARY EMPHASIS */}
+      <section id="fink" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-blue-100 text-blue-700">Our Innovation</Badge>
+            <Badge className="mb-4 bg-purple-100 text-purple-700">The Heart of LearnGraph</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              The Bloom + Fink Framework
+              Fink's Taxonomy of Significant Learning
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              We don't just track <em>what</em> learners know. We understand <em>how</em> they learn,
-              <em>why</em> it matters to them, and <em>who</em> they're becoming.
+              While Bloom measures <em>cognitive complexity</em>, Fink measures <em>learning significance</em>.
+              His six dimensions aren't hierarchical—they're <strong>synergistic</strong>.
+              The most powerful? <span className="text-purple-700 font-semibold">Learning How to Learn</span>.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-start">
-            {/* Bloom's Taxonomy */}
+          {/* Fink's 6 Dimensions - Detailed */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {[
+              {
+                name: 'Foundational Knowledge',
+                question: 'What should they understand and remember?',
+                desc: 'The information, ideas, and perspectives that form the knowledge base. This is where Bloom lives—but it\'s just the beginning.',
+                icon: BookOpen,
+                color: 'amber',
+                importance: 'Foundation',
+              },
+              {
+                name: 'Application',
+                question: 'What should they be able to do?',
+                desc: 'Skills (critical thinking, practical skills, creativity) that let learners engage with the world. Knowing vs. Doing.',
+                icon: Zap,
+                color: 'orange',
+                importance: 'Action',
+              },
+              {
+                name: 'Integration',
+                question: 'What connections should they make?',
+                desc: 'Connecting ideas, subjects, and realms of life. This is your knowledge graph—seeing how everything relates.',
+                icon: Network,
+                color: 'blue',
+                importance: 'Connection',
+              },
+              {
+                name: 'Human Dimension',
+                question: 'What should they learn about themselves?',
+                desc: 'Understanding oneself and others. The inverse profile—metacognitive self-awareness of strengths, struggles, and growth.',
+                icon: Users,
+                color: 'green',
+                importance: 'Self-Knowledge',
+              },
+              {
+                name: 'Caring',
+                question: 'What new feelings, interests, values?',
+                desc: 'Developing new interests, feelings, and values. This is where motivation lives—persistence and productive struggle.',
+                icon: Lightbulb,
+                color: 'pink',
+                importance: 'Motivation',
+              },
+              {
+                name: 'Learning How to Learn',
+                question: 'How can they become self-directed?',
+                desc: 'The meta-skill that enables everything else. Inquiry, self-direction, and the ability to keep learning long after the course ends.',
+                icon: Brain,
+                color: 'purple',
+                importance: 'META-SKILL',
+                highlight: true,
+              },
+            ].map((dim) => {
+              const colorStyles: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+                amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700' },
+                orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+                blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' },
+                green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-100 text-green-700' },
+                pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', badge: 'bg-pink-100 text-pink-700' },
+                purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
+              }
+              const style = colorStyles[dim.color]
+
+              return (
+                <Card
+                  key={dim.name}
+                  className={`${dim.highlight ? 'ring-2 ring-purple-500 shadow-lg' : ''} ${style.border} ${style.bg}`}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className={`w-10 h-10 ${style.badge} rounded-xl flex items-center justify-center`}>
+                        <dim.icon className={`h-5 w-5 ${style.text}`} />
+                      </div>
+                      <Badge className={`${style.badge} text-xs`}>
+                        {dim.importance}
+                      </Badge>
+                    </div>
+                    <h3 className={`font-semibold mb-1 ${style.text}`}>{dim.name}</h3>
+                    <p className="text-xs text-gray-500 italic mb-2">"{dim.question}"</p>
+                    <p className="text-sm text-gray-600">{dim.desc}</p>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Learning How to Learn Callout */}
+          <div className="max-w-4xl mx-auto">
+            <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white overflow-hidden">
+              <CardContent className="pt-8 pb-8">
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <Brain className="h-10 w-10 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">Why "Learning How to Learn" Changes Everything</h3>
+                    <p className="text-purple-100 mb-4">
+                      Most education focuses on <em>what</em> to learn. Fink's sixth dimension—<strong>Learning How to Learn</strong>—is
+                      the meta-skill that determines whether students become lifelong learners or knowledge consumers.
+                    </p>
+                    <div className="grid md:grid-cols-3 gap-4 text-sm">
+                      <div className="bg-white/10 rounded-lg p-3">
+                        <strong className="block text-white">Self-Directed Inquiry</strong>
+                        <span className="text-purple-200">Knowing what questions to ask</span>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-3">
+                        <strong className="block text-white">Metacognitive Awareness</strong>
+                        <span className="text-purple-200">Understanding how you learn best</span>
+                      </div>
+                      <div className="bg-white/10 rounded-lg p-3">
+                        <strong className="block text-white">Adaptive Strategy</strong>
+                        <span className="text-purple-200">Adjusting approach when stuck</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Bloom + Fink Combined Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-blue-100 text-blue-700">The Complete Picture</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Bloom Measures Depth. Fink Measures Significance.
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Bloom's Taxonomy (revised 2001) tells us the <em>cognitive complexity</em> of what learners can do.
+              Fink tells us <em>how that learning matters</em>. Together, they create truly transformative education.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Bloom Card - Secondary */}
             <Card className="overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                 <div className="flex items-center gap-3">
                   <GraduationCap className="h-6 w-6" />
                   <div>
                     <CardTitle className="text-white">Bloom's Taxonomy</CardTitle>
-                    <CardDescription className="text-blue-100">Hierarchical Cognitive Complexity</CardDescription>
+                    <CardDescription className="text-blue-100">Cognitive Complexity (Hierarchical)</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <p className="text-sm text-gray-600 mb-4">
-                  Anderson & Krathwohl (2001) • Universal standard for cognitive objectives
+                  Anderson & Krathwohl (2001) • The skill dimension of our matrix
                 </p>
-                <div className="space-y-2">
+                <div className="space-y-1 text-sm">
                   {[
-                    { level: 6, name: 'Create', desc: 'Produce new or original work', color: 'bg-purple-500' },
-                    { level: 5, name: 'Evaluate', desc: 'Justify decisions, make judgments', color: 'bg-indigo-500' },
-                    { level: 4, name: 'Analyze', desc: 'Draw connections, identify patterns', color: 'bg-blue-500' },
-                    { level: 3, name: 'Apply', desc: 'Use knowledge in new situations', color: 'bg-cyan-500' },
-                    { level: 2, name: 'Understand', desc: 'Explain ideas or concepts', color: 'bg-teal-500' },
-                    { level: 1, name: 'Remember', desc: 'Recall facts and basic concepts', color: 'bg-green-500' },
-                  ].map((item) => (
-                    <div key={item.level} className="flex items-center gap-3">
-                      <div className={`w-8 h-8 ${item.color} rounded flex items-center justify-center text-white text-sm font-bold`}>
-                        {item.level}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{item.name}</div>
-                        <div className="text-xs text-gray-500">{item.desc}</div>
-                      </div>
+                    { level: 'Create', desc: 'Produce new work' },
+                    { level: 'Evaluate', desc: 'Make judgments' },
+                    { level: 'Analyze', desc: 'Draw connections' },
+                    { level: 'Apply', desc: 'Use in new situations' },
+                    { level: 'Understand', desc: 'Explain ideas' },
+                    { level: 'Remember', desc: 'Recall facts' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+                      <span className="w-6 h-6 bg-blue-500 text-white rounded text-xs flex items-center justify-center font-bold">
+                        {6 - i}
+                      </span>
+                      <span className="font-medium text-blue-900">{item.level}</span>
+                      <span className="text-gray-500 text-xs">— {item.desc}</span>
                     </div>
                   ))}
-                </div>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-700">
-                    <strong>What it measures:</strong> Cognitive complexity of mental operations on content
-                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Fink's Taxonomy */}
-            <Card className="overflow-hidden">
+            {/* Fink Card - Primary */}
+            <Card className="overflow-hidden ring-2 ring-purple-300">
               <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
                 <div className="flex items-center gap-3">
                   <Layers className="h-6 w-6" />
                   <div>
                     <CardTitle className="text-white">Fink's Significant Learning</CardTitle>
-                    <CardDescription className="text-purple-100">Holistic Learning Dimensions</CardDescription>
+                    <CardDescription className="text-purple-100">Learning Impact (Synergistic)</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <p className="text-sm text-gray-600 mb-4">
-                  L. Dee Fink (2003) • Non-hierarchical, synergistic dimensions
+                  L. Dee Fink (2003) • Why learning matters to the whole person
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 text-sm">
                   {[
-                    { name: 'Foundational Knowledge', desc: 'Information & ideas', icon: BookOpen, color: 'bg-amber-100 text-amber-700' },
-                    { name: 'Application', desc: 'Skills & thinking', icon: Zap, color: 'bg-orange-100 text-orange-700' },
-                    { name: 'Integration', desc: 'Connecting ideas', icon: Network, color: 'bg-blue-100 text-blue-700' },
-                    { name: 'Human Dimension', desc: 'Self & others', icon: Users, color: 'bg-green-100 text-green-700' },
-                    { name: 'Caring', desc: 'Values & interests', icon: Lightbulb, color: 'bg-pink-100 text-pink-700' },
-                    { name: 'Learning to Learn', desc: 'Meta-skills', icon: Brain, color: 'bg-purple-100 text-purple-700' },
+                    { name: 'Foundation', icon: '📚' },
+                    { name: 'Application', icon: '⚡' },
+                    { name: 'Integration', icon: '🔗' },
+                    { name: 'Human', icon: '👤' },
+                    { name: 'Caring', icon: '💡' },
+                    { name: 'Learning²', icon: '🧠', highlight: true },
                   ].map((item) => (
-                    <div key={item.name} className={`p-3 rounded-lg ${item.color}`}>
-                      <item.icon className="h-4 w-4 mb-1" />
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs opacity-80">{item.desc}</div>
+                    <div
+                      key={item.name}
+                      className={`p-2 rounded flex items-center gap-2 ${item.highlight ? 'bg-purple-100 ring-1 ring-purple-300' : 'bg-purple-50'}`}
+                    >
+                      <span>{item.icon}</span>
+                      <span className={`${item.highlight ? 'font-semibold text-purple-700' : 'text-purple-900'}`}>
+                        {item.name}
+                      </span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <p className="text-xs text-purple-700">
-                    <strong>What it measures:</strong> How learning impacts the whole person—not just their knowledge
+                    <strong>Key insight:</strong> Fink's dimensions aren't hierarchical—they're interconnected.
+                    Progress in one enhances all others.
                   </p>
                 </div>
               </CardContent>
             </Card>
           </div>
+        </div>
+      </section>
 
-          {/* Combined Framework Callout */}
-          <div className="mt-12 p-8 bg-gradient-to-r from-purple-50 via-white to-blue-50 rounded-2xl border border-purple-100">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold mb-2">Why Combine Both?</h3>
-              <p className="text-gray-600 max-w-2xl mx-auto">
-                Bloom tells us <strong>what</strong> learners can do. Fink tells us <strong>why it matters</strong>.
-                Together, they create learning objectives that transform learners, not just inform them.
+      {/* When Students Are Ready Section */}
+      <section id="readiness" className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-amber-100 text-amber-700">Developmental Readiness</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              When Students Are Ready
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              A chainsaw is a powerful tool. But you wouldn't hand one to a second grader.
+              AI-powered learning requires the same developmental consideration.
+            </p>
+          </div>
+
+          {/* Scaffold vs Substitute Framework */}
+          <div className="max-w-4xl mx-auto mb-12">
+            <Card className="overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+                <CardTitle className="text-white text-center">The Scaffold or Substitute Principle</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <h4 className="font-semibold text-green-800">Scaffolding</h4>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Temporary, adaptive support that builds internal capacity. The goal: make the technology
+                      <em> progressively less necessary</em>.
+                    </p>
+                    <ul className="text-xs text-gray-500 space-y-1">
+                      <li>• Hints before answers</li>
+                      <li>• Guides thinking, doesn't replace it</li>
+                      <li>• Fades as competence grows</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <h4 className="font-semibold text-red-800">Substitution</h4>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Permanent dependency where technology assumes cognitive responsibility,
+                      <em> diminishing intrinsic skills</em>.
+                    </p>
+                    <ul className="text-xs text-gray-500 space-y-1">
+                      <li>• AI writes the essay</li>
+                      <li>• Replaces thinking entirely</li>
+                      <li>• Creates "cognitive debt"</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Developmental Stages */}
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* For Teachers */}
+            <Card className="overflow-hidden border-2 border-green-200">
+              <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+                <div className="flex items-center gap-3">
+                  <GraduationCap className="h-6 w-6" />
+                  <div>
+                    <CardTitle className="text-white">For Educators</CardTitle>
+                    <CardDescription className="text-green-100">Pre-K through College Professors</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600 mb-4">
+                  LearnGraph helps educators at <em>every level</em> create materials aligned with learning objectives:
+                </p>
+                <div className="space-y-3">
+                  {[
+                    { stage: 'Early Childhood', desc: 'Foundational skill mapping, prerequisite visualization' },
+                    { stage: 'Elementary', desc: 'Scaffolding progressions, misconception detection' },
+                    { stage: 'Secondary', desc: 'Bloom-aligned assessments, differentiation' },
+                    { stage: 'Higher Ed', desc: 'Threshold concepts, Fink\'s significant learning design' },
+                  ].map((item) => (
+                    <div key={item.stage} className="flex items-start gap-3 p-2 bg-green-50 rounded-lg">
+                      <School className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="font-medium text-sm text-green-800">{item.stage}</span>
+                        <p className="text-xs text-gray-600">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* For Students - Developmental Readiness */}
+            <Card className="overflow-hidden border-2 border-amber-200">
+              <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+                <div className="flex items-center gap-3">
+                  <UserCheck className="h-6 w-6" />
+                  <div>
+                    <CardTitle className="text-white">For Learners</CardTitle>
+                    <CardDescription className="text-amber-100">Developmental Readiness Matters</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600 mb-4">
+                  The full power of self-directed AI learning requires cognitive readiness:
+                </p>
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Baby className="h-4 w-4 text-amber-600" />
+                      <span className="font-medium text-sm text-amber-800">Before Formal Operations (~12)</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      AI as supervised scaffold only. Focus on building foundational cognitive skills without dependency.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Brain className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-sm text-green-800">Adolescence to Adulthood</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Gradual release of responsibility. AI literacy + strategic collaboration → independent metacognition.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Compass className="h-4 w-4 text-purple-600" />
+                      <span className="font-medium text-sm text-purple-800">Postformal Thinking (Adult)</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Full Fink integration. AI amplifies expertise without creating dependency. "Learning How to Learn" fully activated.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Key Principle */}
+          <div className="max-w-3xl mx-auto mt-12">
+            <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl border border-purple-100 text-center">
+              <p className="text-lg text-gray-700">
+                <strong className="text-purple-700">The principle:</strong> AI should develop capabilities, not replace them.
+                Every AI interaction should leave the learner <em>more capable</em> of operating without AI—not more dependent on it.
               </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 border shadow-sm max-w-3xl mx-auto">
-              <div className="text-sm font-medium text-gray-500 mb-3">Example: Rich Learning Objective</div>
-              <div className="p-4 bg-gray-50 rounded-lg mb-4 font-mono text-sm">
-                "Analyze why your neural network architecture failed and redesign it based on your analysis"
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                <div className="p-2 bg-blue-50 rounded"><strong>Bloom:</strong> Analyze + Create (L4+L6)</div>
-                <div className="p-2 bg-amber-50 rounded"><strong>Foundational:</strong> NN concepts</div>
-                <div className="p-2 bg-orange-50 rounded"><strong>Application:</strong> Debugging skills</div>
-                <div className="p-2 bg-blue-50 rounded"><strong>Integration:</strong> Theory ↔ Practice</div>
-                <div className="p-2 bg-green-50 rounded"><strong>Human:</strong> Self-awareness of gaps</div>
-                <div className="p-2 bg-purple-50 rounded"><strong>Learning²:</strong> Debugging as learning</div>
-              </div>
             </div>
           </div>
         </div>
@@ -347,7 +660,6 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {/* Content Analysis */}
             <Card>
               <CardHeader>
                 <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-3">
@@ -359,16 +671,15 @@ export default function LandingPage() {
               <CardContent>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Bloom's Taxonomy (2001)</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Fink's Significant Learning</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Item Response Theory 3PL</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Threshold Concepts</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Cognitive Load Theory</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Prerequisite Mapping</li>
                   <li className="text-xs text-gray-400 pt-1">+ 4 more frameworks</li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Learner Profiling */}
             <Card>
               <CardHeader>
                 <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3">
@@ -383,13 +694,12 @@ export default function LandingPage() {
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Zone of Proximal Development</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> SM-2 Spaced Repetition</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Metacognitive Calibration</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Goal Orientation Detection</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="h-3 w-3 text-green-500" /> Learning How to Learn</li>
                   <li className="text-xs text-gray-400 pt-1">+ 7 more frameworks</li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Modern Research */}
             <Card className="border-amber-200 bg-amber-50/30">
               <CardHeader>
                 <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-3">
@@ -404,7 +714,7 @@ export default function LandingPage() {
                   <li className="flex items-center gap-2"><Clock className="h-3 w-3 text-amber-500" /> Productive Failure (Kapur)</li>
                   <li className="flex items-center gap-2"><Clock className="h-3 w-3 text-amber-500" /> AI Socratic Tutoring (Nature 2025)</li>
                   <li className="flex items-center gap-2"><Clock className="h-3 w-3 text-amber-500" /> Attention Contagion</li>
-                  <li className="flex items-center gap-2"><Clock className="h-3 w-3 text-amber-500" /> Embodied Cognition</li>
+                  <li className="flex items-center gap-2"><Clock className="h-3 w-3 text-amber-500" /> Developmental Readiness</li>
                   <li className="text-xs text-gray-400 pt-1">+ 3 more frameworks</li>
                 </ul>
               </CardContent>
@@ -431,13 +741,12 @@ export default function LandingPage() {
               AI Tools Built for Education
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Not generic chat. Purpose-built tools that understand educational objectives,
-              learning progressions, and pedagogical best practices.
+              Not generic chat. Purpose-built tools that understand Fink's dimensions,
+              learning progressions, and developmental appropriateness.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* For Teachers */}
             <Card className="overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
                 <div className="flex items-center gap-3">
@@ -451,12 +760,12 @@ export default function LandingPage() {
               <CardContent className="pt-6">
                 <div className="grid grid-cols-2 gap-4">
                   {[
-                    { name: 'Lesson Planner', desc: 'Bloom-aligned objectives' },
-                    { name: 'Assessment Creator', desc: 'IRT-calibrated questions' },
+                    { name: 'Lesson Planner', desc: 'Fink-aligned objectives' },
+                    { name: 'Assessment Creator', desc: 'Skill-content matrix' },
                     { name: 'Misconception Addresser', desc: 'Proactive error prevention' },
                     { name: 'Differentiation Engine', desc: 'Scaffolding by readiness' },
-                    { name: 'Curriculum Mapper', desc: 'Prerequisite visualization' },
-                    { name: 'Progress Dashboard', desc: 'Class-wide ZPD view' },
+                    { name: 'Curriculum Mapper', desc: 'Integration visualization' },
+                    { name: 'Progress Dashboard', desc: 'All 6 Fink dimensions' },
                   ].map((tool) => (
                     <div key={tool.name} className="p-3 bg-green-50 rounded-lg">
                       <div className="font-medium text-sm text-green-900">{tool.name}</div>
@@ -467,7 +776,6 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
-            {/* For Students */}
             <Card className="overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
                 <div className="flex items-center gap-3">
@@ -484,7 +792,7 @@ export default function LandingPage() {
                     { name: 'Study Guide Generator', desc: 'Personalized to gaps' },
                     { name: 'Practice Questions', desc: 'Adaptive difficulty' },
                     { name: 'Concept Explainer', desc: 'Multi-level explanations' },
-                    { name: 'Prerequisite Checker', desc: 'Readiness assessment' },
+                    { name: 'Metacognition Coach', desc: 'Learning How to Learn' },
                     { name: 'Spaced Repetition', desc: 'SM-2 powered review' },
                   ].map((tool) => (
                     <div key={tool.name} className="p-3 bg-blue-50 rounded-lg">
@@ -508,8 +816,8 @@ export default function LandingPage() {
               Research Whitepapers
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Comprehensive documentation of our educational psychology foundations,
-              technical architecture, and competitive positioning.
+              Comprehensive documentation of Fink's Significant Learning integration,
+              the skill-content separation principle, and developmental considerations.
             </p>
           </div>
 
@@ -517,7 +825,7 @@ export default function LandingPage() {
             {[
               {
                 title: 'Bloom + Fink Combined Framework',
-                description: 'How we layer Fink\'s holistic dimensions over Bloom\'s cognitive hierarchy to create multi-dimensional learning objectives that transform learners.',
+                description: 'How we layer Fink\'s holistic dimensions over Bloom\'s cognitive hierarchy to create the skill-content matrix that enables Learning How to Learn.',
                 slug: 'bloom-fink-combined-framework',
                 icon: Layers,
                 pages: '~25 pages',
@@ -527,7 +835,7 @@ export default function LandingPage() {
               },
               {
                 title: 'Inverse Profiling Whitepaper',
-                description: 'Technical documentation of our real-time learner modeling system including BKT, ZPD detection, scaffolding adaptation, and metacognitive calibration.',
+                description: 'Real-time learner modeling across all six Fink dimensions, including metacognitive calibration and self-directed learning indicators.',
                 slug: 'inverse-profiling-whitepaper',
                 icon: Brain,
                 pages: '~50 pages',
@@ -536,7 +844,7 @@ export default function LandingPage() {
               },
               {
                 title: 'Educational Research Foundations',
-                description: 'Detailed evidence review for all 29 frameworks with effect sizes, limitations, controversies, and implementation considerations.',
+                description: 'Evidence review for all 29 frameworks with effect sizes, limitations, and developmental considerations.',
                 slug: 'educational-research-foundations',
                 icon: BookOpen,
                 pages: '~100 pages',
@@ -545,7 +853,7 @@ export default function LandingPage() {
               },
               {
                 title: 'Competitive Positioning',
-                description: 'Market analysis comparing LearnGraph to Khan Academy, ALEKS, generic AI tools, and LMS platforms. Our unique value proposition.',
+                description: 'How LearnGraph differs from Khan Academy, ALEKS, and generic AI—and why Fink\'s framework is the differentiator.',
                 slug: 'competitive-positioning',
                 icon: TrendingUp,
                 pages: '~30 pages',
@@ -605,11 +913,11 @@ export default function LandingPage() {
       <section className="py-20 bg-gradient-to-r from-purple-600 to-blue-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Ready to Transform How Your Students Learn?
+            Ready to Teach Learning How to Learn?
           </h2>
           <p className="text-xl text-purple-100 mb-8 max-w-2xl mx-auto">
-            Join educators who are using research-backed AI to create personalized mastery paths
-            for every student.
+            Join educators who are using Fink's Significant Learning framework to create
+            students who don't just know more—they become better learners.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" variant="secondary" asChild className="text-lg px-8 py-6">
@@ -639,15 +947,15 @@ export default function LandingPage() {
                 <span className="text-xl font-bold text-white">LearnGraph</span>
               </div>
               <p className="text-sm">
-                AI-powered learning paths built on 29 educational psychology frameworks.
+                AI-powered significant learning built on Fink's framework and 29 educational psychology principles.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/notebooks" className="hover:text-white transition-colors">Notebooks</Link></li>
-                <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
-                <li><Link href="/research" className="hover:text-white transition-colors">Research</Link></li>
+                <li><Link href="#matrix" className="hover:text-white transition-colors">The Matrix</Link></li>
+                <li><Link href="#fink" className="hover:text-white transition-colors">Fink's Framework</Link></li>
               </ul>
             </div>
             <div>
@@ -655,7 +963,7 @@ export default function LandingPage() {
               <ul className="space-y-2 text-sm">
                 <li><Link href="/research/docs/bloom-fink-combined-framework" className="hover:text-white transition-colors">Bloom + Fink Framework</Link></li>
                 <li><Link href="/research/docs/inverse-profiling-whitepaper" className="hover:text-white transition-colors">Inverse Profiling</Link></li>
-                <li><Link href="/research/docs/educational-research-foundations" className="hover:text-white transition-colors">Research Foundations</Link></li>
+                <li><Link href="/research" className="hover:text-white transition-colors">All Research</Link></li>
               </ul>
             </div>
             <div>
@@ -668,7 +976,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
-            <p>&copy; 2025 LearnGraph. Built with ❤️ for educators.</p>
+            <p>&copy; 2025 LearnGraph. Teaching students to learn how to learn.</p>
           </div>
         </div>
       </footer>
