@@ -37,10 +37,20 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Particles } from '@/components/ui/particles-background'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white relative overflow-hidden">
+      {/* Particles Background */}
+      <Particles
+        className="fixed inset-0 z-0"
+        quantity={100}
+        size={3}
+        colors={["#9333ea", "#3b82f6", "#7c3aed", "#6366f1"]}
+        staticity={50}
+        ease={80}
+      />
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,7 +84,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section - Skill-Content Separation */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-32 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-purple-100 text-purple-700 hover:bg-purple-100">
@@ -163,7 +173,7 @@ export default function LandingPage() {
       </section>
 
       {/* The Skill-Content Matrix Section */}
-      <section id="matrix" className="py-20 bg-gray-50">
+      <section id="matrix" className="relative z-10 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-purple-100 text-purple-700">The Core Innovation</Badge>
@@ -268,7 +278,7 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works - Two-Sided Architecture */}
-      <section id="how-it-works" className="py-20">
+      <section id="how-it-works" className="relative z-10 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-emerald-100 text-emerald-700">Simple Yet Powerful</Badge>
@@ -464,7 +474,7 @@ export default function LandingPage() {
       </section>
 
       {/* Fink's Taxonomy Section - PRIMARY EMPHASIS */}
-      <section id="fink" className="py-20 bg-gray-50">
+      <section id="fink" className="relative z-10 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-purple-100 text-purple-700">The Heart of LearnGraph</Badge>
@@ -601,7 +611,7 @@ export default function LandingPage() {
       </section>
 
       {/* Bloom + Fink Combined Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="relative z-10 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-blue-100 text-blue-700">The Complete Picture</Badge>
@@ -699,7 +709,7 @@ export default function LandingPage() {
       </section>
 
       {/* When Students Are Ready Section */}
-      <section id="readiness" className="py-20">
+      <section id="readiness" className="relative z-10 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-amber-100 text-amber-700">Developmental Readiness</Badge>
@@ -852,7 +862,7 @@ export default function LandingPage() {
       </section>
 
       {/* Research Foundation Section */}
-      <section id="research" className="py-20 bg-gray-50">
+      <section id="research" className="relative z-10 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-green-100 text-green-700">Research Foundation</Badge>
@@ -939,7 +949,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features for Teachers & Students */}
-      <section className="py-20">
+      <section className="relative z-10 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-orange-100 text-orange-700">For the Classroom</Badge>
@@ -1014,7 +1024,7 @@ export default function LandingPage() {
       </section>
 
       {/* Whitepapers Section */}
-      <section id="whitepapers" className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section id="whitepapers" className="relative z-10 py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-purple-100 text-purple-700">Deep Dive</Badge>
@@ -1116,7 +1126,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-purple-600 to-blue-600">
+      <section className="relative z-10 py-20 bg-gradient-to-r from-purple-600 to-blue-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             Ready to Teach Learning How to Learn?
@@ -1142,7 +1152,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 bg-gray-900 text-gray-400">
+      <footer className="relative z-10 py-12 bg-gray-900 text-gray-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>

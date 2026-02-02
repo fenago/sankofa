@@ -11,10 +11,10 @@ export default function AuthLayout({
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/30 to-accent/20 relative overflow-hidden">
       {/* Particles Background */}
       <ParticlesBackground
-        particleDensity={25}
-        minSize={2}
-        maxSize={5}
-        speed={0.8}
+        className="fixed inset-0"
+        quantity={60}
+        size={3}
+        colors={["#9333ea", "#3b82f6", "#7c3aed", "#6366f1"]}
       />
 
       <div className="w-full max-w-md px-4 relative z-10">

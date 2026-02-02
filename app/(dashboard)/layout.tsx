@@ -18,10 +18,10 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Particles Background */}
       <ParticlesBackground
-        particleDensity={30}
-        minSize={2}
-        maxSize={5}
-        speed={0.8}
+        className="fixed inset-0"
+        quantity={80}
+        size={2}
+        colors={["#9333ea", "#3b82f6", "#7c3aed", "#6366f1"]}
       />
 
       {/* Header */}
