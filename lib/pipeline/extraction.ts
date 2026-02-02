@@ -671,6 +671,11 @@ Respond with JSON:
 
   console.log(`[Extraction] Parsed ${parsed.skills?.length || 0} skills, ${parsed.prerequisites?.length || 0} prerequisites`)
 
+  // Debug: Log Fink dimensions from first skill
+  if (parsed.skills?.[0]) {
+    console.log(`[Extraction] Sample skill Fink dimensions:`, parsed.skills[0].finkDimensions, parsed.skills[0].finkPrimaryDimension)
+  }
+
   const now = Date.now()
 
   // Convert to typed result with IDs

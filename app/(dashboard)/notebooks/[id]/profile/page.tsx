@@ -19,7 +19,10 @@ import {
   TrendingUp,
   Clock,
   Sparkles,
+  BarChart3,
+  ChevronRight,
 } from 'lucide-react'
+import Link from 'next/link'
 
 // Status level badge colors
 const statusColors: Record<StatusLevel, string> = {
@@ -293,6 +296,25 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Link to Frameworks Overview */}
+      <Link
+        href={`/notebooks/${notebookId}/frameworks`}
+        className="flex items-center justify-between p-4 mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 hover:border-indigo-300 hover:shadow-md transition-all group"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
+            <BarChart3 className="h-6 w-6 text-indigo-600" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">Frameworks Overview</div>
+            <div className="text-sm text-muted-foreground">
+              See all educational psychology metadata from content extraction AND your learning progress
+            </div>
+          </div>
+        </div>
+        <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+      </Link>
+
       {/* Top insights and priority actions */}
       {(dashboard.topInsights.length > 0 || dashboard.priorityActions.length > 0) && (
         <div className="grid md:grid-cols-2 gap-4 mb-8">
@@ -371,7 +393,7 @@ export default function ProfilePage() {
         </h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {dashboard.frameworks
-            .filter(f => ['bloom', 'zpd', 'threshold'].includes(f.id))
+            .filter(f => ['bloom', 'fink', 'zpd', 'threshold'].includes(f.id))
             .map((framework) => (
               <FrameworkCard key={framework.id} framework={framework} />
             ))}

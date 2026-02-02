@@ -12,8 +12,9 @@ import { createClient } from '@/lib/supabase/server'
 import { isNeo4JAvailable, getSession } from '@/lib/graph/neo4j'
 import { getMasteredSkillIds, getLearnerStatesByNotebook } from '@/lib/graph/learner-state'
 import { getZPDSkills } from '@/lib/graph/store'
-import { buildFrameworkDashboard } from '@/lib/profile/framework-interpreter'
+import { buildFrameworkDashboard, FinkDimensionStats } from '@/lib/profile/framework-interpreter'
 import type { InverseProfile } from '@/lib/types/interactions'
+import type { FinkDimension } from '@/lib/types/graph'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -67,12 +68,23 @@ export async function GET(request: Request, { params }: RouteParams) {
         }
       : null
 
+    // Initialize Fink dimension stats
+    const initFinkStats = (): FinkDimensionStats => ({
+      foundational_knowledge: { total: 0, mastered: 0 },
+      application: { total: 0, mastered: 0 },
+      integration: { total: 0, mastered: 0 },
+      human_dimension: { total: 0, mastered: 0 },
+      caring: { total: 0, mastered: 0 },
+      learning_how_to_learn: { total: 0, mastered: 0 },
+    })
+
     // Initialize stats with defaults
     let stats = {
       skills: { total: 0, mastered: 0, inProgress: 0, notStarted: 0 },
       practice: { totalAttempts: 0, avgDifficulty: 0.5, avgAccuracy: 0.5 },
       sm2: { dueSkills: 0, totalScheduled: 0, overdueCount: 0, avgInterval: 0 },
       bloom: {} as Record<number, { total: number; mastered: number }>,
+      fink: initFinkStats(),
       sessions: { avgDurationMin: 0, totalSessions: 0 },
       zpd: { zpdSkillCount: 0 },
       threshold: { total: 0, mastered: 0, inProgress: 0 },
@@ -90,7 +102,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         // Get all skills for this notebook
         const skillsResult = await session.run(
           `MATCH (s:Skill {notebookId: $notebookId})
-           RETURN s.id AS id, s.bloomLevel AS bloomLevel, s.isThresholdConcept AS isThreshold`,
+           RETURN s.id AS id, s.bloomLevel AS bloomLevel, s.isThresholdConcept AS isThreshold, s.finkDimensions AS finkDimensions`,
           { notebookId }
         )
 
@@ -98,6 +110,7 @@ export async function GET(request: Request, { params }: RouteParams) {
           id: r.get('id') as string,
           bloomLevel: r.get('bloomLevel') as number,
           isThreshold: r.get('isThreshold') as boolean,
+          finkDimensions: (r.get('finkDimensions') as string[] | null) ?? [],
         }))
 
         stats.skills.total = allSkills.length
@@ -107,13 +120,19 @@ export async function GET(request: Request, { params }: RouteParams) {
           stats.bloom[level] = { total: 0, mastered: 0 }
         }
 
-        // Count skills by bloom level
+        // Count skills by bloom level and Fink dimensions
         for (const skill of allSkills) {
           if (skill.bloomLevel >= 1 && skill.bloomLevel <= 6) {
             stats.bloom[skill.bloomLevel].total++
           }
           if (skill.isThreshold) {
             stats.threshold.total++
+          }
+          // Count Fink dimensions (skill can belong to multiple dimensions)
+          for (const dim of skill.finkDimensions) {
+            if (dim in stats.fink) {
+              stats.fink[dim as FinkDimension].total++
+            }
           }
         }
 
@@ -134,7 +153,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         stats.skills.inProgress = inProgressIds.size
         stats.skills.notStarted = stats.skills.total - masteredIds.size - inProgressIds.size
 
-        // Count mastered by bloom level and threshold
+        // Count mastered by bloom level, threshold, and Fink dimensions
         for (const skill of allSkills) {
           if (masteredIds.has(skill.id)) {
             if (skill.bloomLevel >= 1 && skill.bloomLevel <= 6) {
@@ -142,6 +161,12 @@ export async function GET(request: Request, { params }: RouteParams) {
             }
             if (skill.isThreshold) {
               stats.threshold.mastered++
+            }
+            // Count mastered Fink dimensions
+            for (const dim of skill.finkDimensions) {
+              if (dim in stats.fink) {
+                stats.fink[dim as FinkDimension].mastered++
+              }
             }
           } else if (inProgressIds.has(skill.id) && skill.isThreshold) {
             stats.threshold.inProgress++

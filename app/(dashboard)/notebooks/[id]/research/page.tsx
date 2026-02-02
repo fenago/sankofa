@@ -22,6 +22,14 @@ const contentAnalysisFrameworks = [
     status: "implemented" as const,
   },
   {
+    name: "Fink's Taxonomy of Significant Learning",
+    researcher: "L. Dee Fink (2003)",
+    icon: Layers,
+    description: "6 holistic dimensions: Foundational, Application, Integration, Human, Caring, Learning to Learn",
+    application: "Non-hierarchical dimensions that capture motivation, metacognition, and transfer",
+    status: "implemented" as const,
+  },
+  {
     name: "Item Response Theory (3PL)",
     researcher: "Lord (1980)",
     icon: BarChart3,
@@ -263,6 +271,13 @@ const modernTBDFrameworks = [
 
 const whitepapers = [
   {
+    title: "Bloom + Fink Combined Framework",
+    description: "How combining Bloom's cognitive hierarchy with Fink's holistic dimensions creates a multi-dimensional model for self-directed learning",
+    path: "/docs/LearnGraph_Bloom_Fink_Combined_Framework.md",
+    icon: Layers,
+    pages: "~25 pages",
+  },
+  {
     title: "Inverse Profiling Whitepaper",
     description: "Comprehensive technical documentation of the Inverse Profiling system including BKT, ZPD, scaffolding, and real-time adaptation",
     path: "/docs/LearnGraph_Inverse_Profiling_Whitepaper.md",
@@ -341,7 +356,7 @@ export default function ResearchPage({ params }: PageProps) {
               </Button>
               <div>
                 <h1 className="text-xl font-bold">Educational Psychology Research</h1>
-                <p className="text-sm text-gray-500">29 frameworks: 21 implemented + 8 under consideration</p>
+                <p className="text-sm text-gray-500">30 frameworks: 22 implemented + 8 under consideration</p>
               </div>
             </div>
           </div>
@@ -353,7 +368,7 @@ export default function ResearchPage({ params }: PageProps) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-blue-600">21</div>
+              <div className="text-3xl font-bold text-blue-600">22</div>
               <div className="text-sm text-gray-500">Implemented</div>
             </CardContent>
           </Card>
@@ -365,13 +380,13 @@ export default function ResearchPage({ params }: PageProps) {
           </Card>
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-green-600">29</div>
+              <div className="text-3xl font-bold text-green-600">30</div>
               <div className="text-sm text-gray-500">Total Frameworks</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-purple-600">4</div>
+              <div className="text-3xl font-bold text-purple-600">5</div>
               <div className="text-sm text-gray-500">Whitepapers</div>
             </CardContent>
           </Card>
@@ -414,7 +429,7 @@ export default function ResearchPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-blue-600" />
             Content Analysis Frameworks
-            <Badge className="ml-2">9 Implemented</Badge>
+            <Badge className="ml-2">10 Implemented</Badge>
           </h2>
           <p className="text-sm text-gray-500 mb-4">Applied during source processing to build an educationally-grounded knowledge graph</p>
           <div className="grid md:grid-cols-3 gap-4">
@@ -467,6 +482,7 @@ export default function ResearchPage({ params }: PageProps) {
                   <h4 className="font-medium text-gray-900 mb-2">Implemented Frameworks</h4>
                   <ul className="space-y-1">
                     <li>Anderson & Krathwohl (2001) - Bloom's Taxonomy</li>
+                    <li>Fink (2003) - Significant Learning Taxonomy</li>
                     <li>Corbett & Anderson (1995) - BKT</li>
                     <li>Lord (1980) - Item Response Theory</li>
                     <li>Meyer & Land (2003) - Threshold Concepts</li>

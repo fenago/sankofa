@@ -19,6 +19,41 @@ export const BLOOM_DESCRIPTIONS: Record<BloomLevel, string> = {
   6: 'Produce new or original work',
 }
 
+// Fink's Taxonomy of Significant Learning (2003)
+// Non-hierarchical, interactive dimensions that enhance each other
+export type FinkDimension =
+  | 'foundational_knowledge'
+  | 'application'
+  | 'integration'
+  | 'human_dimension'
+  | 'caring'
+  | 'learning_how_to_learn'
+
+export const FINK_LABELS: Record<FinkDimension, string> = {
+  foundational_knowledge: 'Foundational Knowledge',
+  application: 'Application',
+  integration: 'Integration',
+  human_dimension: 'Human Dimension',
+  caring: 'Caring',
+  learning_how_to_learn: 'Learning How to Learn',
+}
+
+export const FINK_DESCRIPTIONS: Record<FinkDimension, string> = {
+  foundational_knowledge: 'Understanding and remembering information and ideas',
+  application: 'Skills, thinking critically, creativity, managing projects',
+  integration: 'Connecting ideas, people, and realms of life',
+  human_dimension: 'Learning about oneself and others',
+  caring: 'Developing new feelings, interests, or values',
+  learning_how_to_learn: 'Becoming a better, self-directed learner',
+}
+
+// Cross-dimension integration for Fink's synergistic relationships
+export interface FinkIntegration {
+  fromDimension: FinkDimension
+  toDimension: FinkDimension
+  description: string // How this skill connects the two dimensions
+}
+
 // Assessment types for skills
 export type AssessmentType = 'formative' | 'summative' | 'performance' | 'diagnostic' | 'peer'
 
@@ -36,9 +71,14 @@ export interface SkillNode {
   description: string
   notebookId: string
 
-  // Bloom's Taxonomy
+  // Bloom's Taxonomy (hierarchical cognitive levels)
   bloomLevel: BloomLevel
   secondaryBloomLevels?: BloomLevel[]
+
+  // Fink's Taxonomy (non-hierarchical, synergistic dimensions)
+  finkDimensions?: FinkDimension[] // All dimensions this skill addresses
+  finkPrimaryDimension?: FinkDimension // Most prominent dimension
+  finkIntegrations?: FinkIntegration[] // How this skill connects dimensions
 
   // Effort estimation
   estimatedMinutes?: number

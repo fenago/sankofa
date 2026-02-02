@@ -43,6 +43,9 @@ export async function storeSkills(skills: SkillNode[]): Promise<void> {
             s.notebookId = $notebookId,
             s.bloomLevel = $bloomLevel,
             s.secondaryBloomLevels = $secondaryBloomLevels,
+            s.finkDimensions = $finkDimensions,
+            s.finkPrimaryDimension = $finkPrimaryDimension,
+            s.finkIntegrations = $finkIntegrations,
             s.estimatedMinutes = $estimatedMinutes,
             s.difficulty = $difficulty,
             s.irtDifficulty = $irtDifficulty,
@@ -73,6 +76,10 @@ export async function storeSkills(skills: SkillNode[]): Promise<void> {
           notebookId: skill.notebookId,
           bloomLevel: skill.bloomLevel,
           secondaryBloomLevels: skill.secondaryBloomLevels || [],
+          // Fink's Taxonomy of Significant Learning
+          finkDimensions: skill.finkDimensions || [],
+          finkPrimaryDimension: skill.finkPrimaryDimension || null,
+          finkIntegrations: skill.finkIntegrations ? JSON.stringify(skill.finkIntegrations) : null,
           estimatedMinutes: skill.estimatedMinutes || null,
           difficulty: skill.difficulty || null,
           // IRT 3PL parameters

@@ -38,7 +38,7 @@ export default function DashboardLayout({
               <span className="text-[10px] text-muted-foreground leading-tight">by DrLee.AI</span>
             </div>
             <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-mono font-medium">
-              v0.5.0
+              v0.6.1
             </span>
           </Link>
 

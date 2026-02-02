@@ -58,6 +58,10 @@ interface RawSkill {
   keywords?: string[]
   domain?: string
   subdomain?: string
+  // Fink's Taxonomy of Significant Learning
+  finkDimensions?: string[]
+  finkPrimaryDimension?: string
+  finkIntegrations?: string
 }
 
 interface RawPrerequisite {
@@ -316,6 +320,27 @@ Identify transformative, irreversible, integrative knowledge that may be trouble
 ### 6. Mastery Learning (Bloom)
 - Mastery threshold: 0.80 standard, 0.90 for threshold concepts
 
+### 7. Fink's Taxonomy of Significant Learning (2003)
+Fink's Taxonomy is NON-HIERARCHICAL - skills can span multiple dimensions simultaneously.
+
+Dimensions (assign ALL that apply):
+- **foundational_knowledge**: Core facts, concepts, terminology the learner must know
+- **application**: Practical skills, critical thinking, problem-solving, creativity
+- **integration**: Connecting ideas across domains, seeing relationships and patterns
+- **human_dimension**: Self-understanding, understanding others, social/emotional aspects
+- **caring**: Developing new feelings, interests, values, motivation for the subject
+- **learning_how_to_learn**: Metacognition, self-directed learning, learning strategies
+
+For each skill, identify:
+1. finkDimensions: Array of ALL applicable dimensions (most skills have 2-4)
+2. finkPrimaryDimension: The MOST dominant dimension
+3. finkIntegrations: How this skill connects dimensions (e.g., "Applies foundational knowledge to develop human dimension awareness")
+
+Example: "Analyze your own learning style"
+- finkDimensions: ["human_dimension", "learning_how_to_learn", "foundational_knowledge"]
+- finkPrimaryDimension: "human_dimension"
+- finkIntegrations: "Uses foundational knowledge about learning styles to develop self-awareness and metacognitive skills"
+
 ## PREREQUISITE RELATIONSHIPS - ENSURE FULL CONNECTIVITY
 
 Build a CONNECTED learning graph where every skill participates in at least one relationship.
@@ -359,7 +384,10 @@ ${text}
       "transferDomains": [],
       "keywords": [],
       "domain": "",
-      "subdomain": ""
+      "subdomain": "",
+      "finkDimensions": ["foundational_knowledge", "application"],
+      "finkPrimaryDimension": "foundational_knowledge",
+      "finkIntegrations": "How this skill integrates multiple dimensions"
     }
   ],
   "prerequisites": [
@@ -382,6 +410,7 @@ Before returning, verify:
 ✓ Obvious prerequisite skills are added even if not in source
 ✓ Every skill has IRT params, cognitive load, scaffolding levels
 ✓ Threshold concepts have unlocksDomains and troublesomeAspects
+✓ EVERY skill has finkDimensions (array with 1-4 dimensions), finkPrimaryDimension, and finkIntegrations
 
 **CRITICAL - CONNECTIVITY CHECK:**
 ✓ Count skills with NO prerequisites AND are not a prerequisite for anything = 0
@@ -499,6 +528,10 @@ Before returning, verify:
     keywords: s.keywords || [],
     domain: s.domain,
     subdomain: s.subdomain,
+    // Fink's Taxonomy
+    finkDimensions: s.finkDimensions || [],
+    finkPrimaryDimension: s.finkPrimaryDimension,
+    finkIntegrations: s.finkIntegrations,
     sourceDocumentId,
     createdAt: now,
     updatedAt: now,

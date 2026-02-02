@@ -11,7 +11,7 @@ import ReactFlow, {
   MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen, Trash2, Database, CheckCircle2, FileText, Brain, GitBranch } from "lucide-react";
+import { Loader2, Network, AlertCircle, RefreshCw, Sparkles, Users, BookOpen, Trash2, Database, CheckCircle2, FileText, Brain, GitBranch, Layers } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,17 +23,63 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useGraph } from "@/hooks/useGraph";
+import { useSources } from "@/hooks/useSources";
 import { mutate } from "swr";
 import { notebookKeys } from "@/hooks/useNotebooks";
 
-// Fink dimension labels
-const FINK_LABELS: Record<string, { name: string; color: string }> = {
-  foundational_knowledge: { name: 'Foundational', color: 'bg-blue-100 text-blue-700' },
-  application: { name: 'Application', color: 'bg-green-100 text-green-700' },
-  integration: { name: 'Integration', color: 'bg-purple-100 text-purple-700' },
-  human_dimension: { name: 'Human', color: 'bg-pink-100 text-pink-700' },
-  caring: { name: 'Caring', color: 'bg-red-100 text-red-700' },
-  learning_how_to_learn: { name: 'Meta-Learning', color: 'bg-amber-100 text-amber-700' },
+// Polling interval for extraction job status (ms)
+const POLL_INTERVAL = 3000;
+
+// Fink dimension labels with practical guidance
+const FINK_LABELS: Record<string, {
+  name: string;
+  color: string;
+  description: string;
+  question: string;
+  activities: string[];
+}> = {
+  foundational_knowledge: {
+    name: 'Foundational',
+    color: 'bg-blue-100 text-blue-700',
+    description: 'The facts, concepts, and principles you need to understand',
+    question: 'What are the key ideas I need to remember and understand?',
+    activities: ['Create a summary in your own words', 'Make flashcards for key terms', 'Draw a concept map']
+  },
+  application: {
+    name: 'Application',
+    color: 'bg-green-100 text-green-700',
+    description: 'Using knowledge to solve real problems and complete tasks',
+    question: 'How can I use this to solve problems or create something?',
+    activities: ['Work through practice problems', 'Build a project using these concepts', 'Apply to a real situation in your life']
+  },
+  integration: {
+    name: 'Integration',
+    color: 'bg-purple-100 text-purple-700',
+    description: 'Connecting ideas across topics, disciplines, and experiences',
+    question: 'How does this connect to other things I know?',
+    activities: ['Find connections to other subjects', 'Compare with your prior knowledge', 'Identify patterns across topics']
+  },
+  human_dimension: {
+    name: 'Human',
+    color: 'bg-pink-100 text-pink-700',
+    description: 'Learning about yourself and how to interact with others',
+    question: 'What does this teach me about myself or others?',
+    activities: ['Reflect on personal relevance', 'Discuss with peers', 'Consider different perspectives']
+  },
+  caring: {
+    name: 'Caring',
+    color: 'bg-red-100 text-red-700',
+    description: 'Developing new interests, feelings, and values',
+    question: 'Why does this matter? What do I care about now?',
+    activities: ['Explore why this topic matters', 'Find aspects that excite you', 'Consider ethical implications']
+  },
+  learning_how_to_learn: {
+    name: 'Meta-Learning',
+    color: 'bg-amber-100 text-amber-700',
+    description: 'Becoming a better, more self-directed learner',
+    question: 'How can I learn this better and apply these strategies elsewhere?',
+    activities: ['Identify what study methods work', 'Set learning goals', 'Reflect on your learning process']
+  },
 };
 
 interface Skill {
@@ -132,13 +178,410 @@ const entityTypeColors: Record<string, string> = {
 const nodeTypes = {};
 const edgeTypes = {};
 
+// Fink dimension keys for positioning in hexagon
+const FINK_KEYS = ['foundational_knowledge', 'application', 'integration', 'human_dimension', 'caring', 'learning_how_to_learn'] as const;
+
+// Fink Taxonomy sub-component with Connections visualization
+function FinkTaxonomyView({ graphData, expanded }: { graphData: { skills: Skill[] }; expanded?: boolean }) {
+  const [finkView, setFinkView] = useState<'dimensions' | 'connections'>('connections');
+  const [selectedConnection, setSelectedConnection] = useState<{ from: string; to: string } | null>(null);
+  const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
+
+  // Calculate connections between dimensions
+  const connections = useMemo(() => {
+    const conn: Record<string, { count: number; skills: Skill[] }> = {};
+
+    graphData.skills.forEach(skill => {
+      if (skill.finkDimensions && skill.finkDimensions.length > 1) {
+        // This skill spans multiple dimensions - create connections
+        const dims = skill.finkDimensions;
+        for (let i = 0; i < dims.length; i++) {
+          for (let j = i + 1; j < dims.length; j++) {
+            const key = [dims[i], dims[j]].sort().join('--');
+            if (!conn[key]) {
+              conn[key] = { count: 0, skills: [] };
+            }
+            conn[key].count++;
+            conn[key].skills.push(skill);
+          }
+        }
+      }
+    });
+
+    return conn;
+  }, [graphData.skills]);
+
+  // Get position for each dimension in hexagon layout
+  const getHexPosition = (index: number, radius: number, centerX: number, centerY: number) => {
+    const angle = (index * 60 - 90) * (Math.PI / 180); // Start from top, go clockwise
+    return {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle),
+    };
+  };
+
+  const totalFinkSkills = graphData.skills.filter(
+    s => s.finkDimensions && s.finkDimensions.length > 0
+  ).length;
+
+  const multiDimSkills = graphData.skills.filter(
+    s => s.finkDimensions && s.finkDimensions.length > 1
+  ).length;
+
+  if (totalFinkSkills === 0 && graphData.skills.length > 0) {
+    return (
+      <div className={`overflow-y-auto ${expanded ? "flex-1" : "max-h-[380px]"}`}>
+        <div className="p-3 bg-white rounded-lg border border-gray-200">
+          <div className="p-3 bg-amber-50 rounded border border-amber-200 text-xs text-amber-700">
+            <span className="font-medium">No Fink data found.</span> Re-extract the knowledge graph to generate Fink&apos;s Taxonomy dimensions.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`overflow-y-auto ${expanded ? "flex-1" : "max-h-[380px]"}`}>
+      <div className="p-3 bg-white rounded-lg border border-gray-200">
+        {/* Header with view toggle */}
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold text-sm text-gray-900">Fink&apos;s Taxonomy</h4>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setFinkView('connections')}
+              className={`px-2 py-1 text-[10px] font-medium rounded ${
+                finkView === 'connections' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+              }`}
+            >
+              Connections
+            </button>
+            <button
+              onClick={() => setFinkView('dimensions')}
+              className={`px-2 py-1 text-[10px] font-medium rounded ${
+                finkView === 'dimensions' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+              }`}
+            >
+              By Dimension
+            </button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex gap-3 mb-3 text-[10px] text-gray-500">
+          <span>{totalFinkSkills} skills with Fink data</span>
+          <span>•</span>
+          <span>{multiDimSkills} span multiple dimensions</span>
+        </div>
+
+        {/* Connections View - Hexagonal Web */}
+        {finkView === 'connections' && (
+          <div className="space-y-3">
+            {/* SVG Hexagon Visualization */}
+            <div className="relative bg-gray-50 rounded-lg p-2" style={{ height: expanded ? 350 : 220 }}>
+              <svg width="100%" height="100%" viewBox="0 0 300 260" className="mx-auto">
+                {/* Connection lines */}
+                {Object.entries(connections).map(([key, data]) => {
+                  const [from, to] = key.split('--');
+                  const fromIndex = FINK_KEYS.indexOf(from as typeof FINK_KEYS[number]);
+                  const toIndex = FINK_KEYS.indexOf(to as typeof FINK_KEYS[number]);
+                  if (fromIndex === -1 || toIndex === -1) return null;
+
+                  const fromPos = getHexPosition(fromIndex, 90, 150, 130);
+                  const toPos = getHexPosition(toIndex, 90, 150, 130);
+                  const isSelected = selectedConnection?.from === from && selectedConnection?.to === to;
+                  const strokeWidth = Math.min(1 + data.count * 0.8, 6);
+
+                  return (
+                    <line
+                      key={key}
+                      x1={fromPos.x}
+                      y1={fromPos.y}
+                      x2={toPos.x}
+                      y2={toPos.y}
+                      stroke={isSelected ? '#7c3aed' : '#d1d5db'}
+                      strokeWidth={strokeWidth}
+                      className="cursor-pointer transition-all hover:stroke-purple-400"
+                      onClick={() => {
+                        setSelectedConnection(isSelected ? null : { from, to });
+                        setSelectedDimension(null);
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Dimension nodes */}
+                {FINK_KEYS.map((dimKey, index) => {
+                  const pos = getHexPosition(index, 90, 150, 130);
+                  const dimInfo = FINK_LABELS[dimKey];
+                  const skillCount = graphData.skills.filter(
+                    s => s.finkDimensions?.includes(dimKey)
+                  ).length;
+                  const isSelected = selectedDimension === dimKey;
+
+                  // Extract background color from class
+                  const bgColorMatch = dimInfo.color.match(/bg-(\w+)-100/);
+                  const fillColor = bgColorMatch ? {
+                    'blue': '#dbeafe',
+                    'green': '#dcfce7',
+                    'purple': '#f3e8ff',
+                    'pink': '#fce7f3',
+                    'red': '#fee2e2',
+                    'amber': '#fef3c7',
+                  }[bgColorMatch[1]] || '#f3f4f6' : '#f3f4f6';
+
+                  const textColorMatch = dimInfo.color.match(/text-(\w+)-700/);
+                  const textColor = textColorMatch ? {
+                    'blue': '#1d4ed8',
+                    'green': '#15803d',
+                    'purple': '#7c3aed',
+                    'pink': '#be185d',
+                    'red': '#b91c1c',
+                    'amber': '#b45309',
+                  }[textColorMatch[1]] || '#374151' : '#374151';
+
+                  return (
+                    <g
+                      key={dimKey}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setSelectedDimension(isSelected ? null : dimKey);
+                        setSelectedConnection(null);
+                      }}
+                    >
+                      <circle
+                        cx={pos.x}
+                        cy={pos.y}
+                        r={28}
+                        fill={fillColor}
+                        stroke={isSelected ? '#000' : textColor}
+                        strokeWidth={isSelected ? 3 : 2}
+                        className="transition-all hover:opacity-80"
+                      />
+                      <text
+                        x={pos.x}
+                        y={pos.y - 5}
+                        textAnchor="middle"
+                        className="text-[9px] font-medium pointer-events-none"
+                        fill={textColor}
+                      >
+                        {dimInfo.name}
+                      </text>
+                      <text
+                        x={pos.x}
+                        y={pos.y + 8}
+                        textAnchor="middle"
+                        className="text-[8px] pointer-events-none"
+                        fill="#6b7280"
+                      >
+                        {skillCount} skills
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+
+            {/* Selected dimension details */}
+            {selectedDimension && (() => {
+              const dimInfo = FINK_LABELS[selectedDimension];
+              const dimSkills = graphData.skills.filter(s => s.finkDimensions?.includes(selectedDimension));
+              return (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <span className={`px-2 py-1 text-xs font-medium rounded ${dimInfo?.color}`}>
+                      {dimInfo?.name}
+                    </span>
+                    <button
+                      onClick={() => setSelectedDimension(null)}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Key Question */}
+                  <div className="p-2 bg-white rounded border-l-4 border-blue-400">
+                    <div className="text-[10px] font-medium text-blue-600 mb-0.5">Ask Yourself:</div>
+                    <div className="text-xs text-gray-800 italic">&ldquo;{dimInfo?.question}&rdquo;</div>
+                  </div>
+
+                  {/* What this means for your content */}
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-600 mb-1.5">
+                      From your content ({dimSkills.length} skills):
+                    </div>
+                    <div className="space-y-2 max-h-28 overflow-y-auto">
+                      {dimSkills.slice(0, 5).map(skill => (
+                        <div key={skill.id} className="p-2 bg-white rounded border border-gray-100">
+                          <div className="text-xs font-medium text-gray-900">{skill.name}</div>
+                          {skill.description && (
+                            <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{skill.description}</div>
+                          )}
+                        </div>
+                      ))}
+                      {dimSkills.length > 5 && (
+                        <div className="text-[10px] text-gray-400 text-center">+{dimSkills.length - 5} more</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Suggested Activities */}
+                  <div className="p-2 bg-green-50 rounded border border-green-200">
+                    <div className="text-[10px] font-medium text-green-700 mb-1">Try These Activities:</div>
+                    <ul className="text-[10px] text-green-800 space-y-0.5">
+                      {dimInfo?.activities.map((activity, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <span className="text-green-500">•</span>
+                          {activity}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Selected connection details */}
+            {selectedConnection && connections[`${[selectedConnection.from, selectedConnection.to].sort().join('--')}`] && (() => {
+              const connKey = `${[selectedConnection.from, selectedConnection.to].sort().join('--')}`;
+              const connData = connections[connKey];
+              const fromInfo = FINK_LABELS[selectedConnection.from];
+              const toInfo = FINK_LABELS[selectedConnection.to];
+              return (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded ${fromInfo?.color}`}>
+                        {fromInfo?.name}
+                      </span>
+                      <span className="text-purple-400">↔</span>
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded ${toInfo?.color}`}>
+                        {toInfo?.name}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedConnection(null)}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Why this connection matters */}
+                  <div className="p-2 bg-white rounded border-l-4 border-purple-400">
+                    <div className="text-[10px] font-medium text-purple-600 mb-0.5">Why this matters:</div>
+                    <div className="text-[10px] text-gray-700">
+                      These {connData.count} skills connect <strong>{fromInfo?.name}</strong> ({fromInfo?.description?.toLowerCase()})
+                      with <strong>{toInfo?.name}</strong> ({toInfo?.description?.toLowerCase()}).
+                    </div>
+                  </div>
+
+                  {/* Skills that bridge */}
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-600 mb-1.5">
+                      Skills that bridge both dimensions:
+                    </div>
+                    <div className="space-y-2 max-h-24 overflow-y-auto">
+                      {connData.skills.slice(0, 4).map(skill => (
+                        <div key={skill.id} className="p-2 bg-white rounded border border-purple-100">
+                          <div className="text-xs font-medium text-gray-900">{skill.name}</div>
+                          {skill.description && (
+                            <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{skill.description}</div>
+                          )}
+                        </div>
+                      ))}
+                      {connData.skills.length > 4 && (
+                        <div className="text-[10px] text-gray-400 text-center">+{connData.skills.length - 4} more</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Practical suggestion */}
+                  <div className="p-2 bg-purple-100 rounded text-[10px] text-purple-800">
+                    <strong>Try:</strong> Take one skill above and ask yourself both &ldquo;{fromInfo?.question?.split('?')[0]}?&rdquo;
+                    AND &ldquo;{toInfo?.question?.split('?')[0]}?&rdquo;
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Hint when nothing selected */}
+            {!selectedConnection && !selectedDimension && (
+              <div className="text-[10px] text-gray-500 text-center">
+                Click a dimension circle or connection line to explore
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dimensions View - Grid of cards */}
+        {finkView === 'dimensions' && (
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(FINK_LABELS).map(([dimKey, dimInfo]) => {
+              const skillsWithDim = graphData.skills.filter(
+                s => s.finkDimensions?.includes(dimKey) || s.finkPrimaryDimension === dimKey
+              );
+
+              return (
+                <div
+                  key={dimKey}
+                  className={`p-2 rounded-lg border ${dimInfo.color.replace('text-', 'border-').replace('-700', '-200')} ${dimInfo.color.split(' ')[0]}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`font-medium text-xs ${dimInfo.color.split(' ')[1]}`}>
+                      {dimInfo.name}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      {skillsWithDim.length} skills
+                    </span>
+                  </div>
+                  {/* Key question for this dimension */}
+                  <div className="text-[9px] text-gray-500 italic mb-1.5 line-clamp-1" title={dimInfo.question}>
+                    &ldquo;{dimInfo.question}&rdquo;
+                  </div>
+                  {skillsWithDim.length > 0 ? (
+                    <div className="space-y-1 max-h-16 overflow-y-auto">
+                      {skillsWithDim.slice(0, 2).map(skill => (
+                        <div
+                          key={skill.id}
+                          className="text-[10px] text-gray-600 truncate"
+                          title={skill.name}
+                        >
+                          {skill.finkPrimaryDimension === dimKey && '★ '}
+                          {skill.name}
+                        </div>
+                      ))}
+                      {skillsWithDim.length > 2 && (
+                        <div className="text-[10px] text-gray-400">
+                          +{skillsWithDim.length - 2} more
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-gray-400 italic">No skills</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPanelProps) {
   // Use SWR for cached graph data
   const { skills, entities, prerequisites, loading, error: graphError, refetch } = useGraph(notebookId);
 
+  // Get sources for extraction
+  const { sources } = useSources(notebookId);
+
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities" | "metadata">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "skills" | "entities" | "fink" | "metadata">("graph");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showGranularityDialog, setShowGranularityDialog] = useState(false);
@@ -149,6 +592,10 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   const [extractionStep, setExtractionStep] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const extractionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track extraction jobs for polling
+  const [activeJobs, setActiveJobs] = useState<Map<string, string>>(new Map()); // sourceId -> jobId
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Extraction steps for progress display
   const extractionSteps = [
@@ -204,6 +651,72 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
   // Combine errors
   const error = extractionError || graphError;
 
+  // Check extraction job status for a source
+  const checkJobStatus = useCallback(async (sourceId: string): Promise<{ done: boolean; skillCount: number }> => {
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}/graph`);
+      if (!res.ok) return { done: false, skillCount: 0 };
+      const data = await res.json();
+      // Job is done when not extracting and either has skills or job completed
+      const isDone = !data.extracting && (data.skillCount > 0 || data.lastJob?.status === 'completed' || data.lastJob?.status === 'failed');
+      return { done: isDone, skillCount: data.skillCount || 0 };
+    } catch {
+      return { done: false, skillCount: 0 };
+    }
+  }, [notebookId]);
+
+  // Poll for extraction completion
+  useEffect(() => {
+    if (activeJobs.size === 0) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    console.log(`[KnowledgeGraph] Polling ${activeJobs.size} active extraction jobs`);
+
+    pollIntervalRef.current = setInterval(async () => {
+      const newActiveJobs = new Map(activeJobs);
+      let completedCount = 0;
+
+      for (const [sourceId] of activeJobs) {
+        const { done, skillCount } = await checkJobStatus(sourceId);
+        if (done) {
+          console.log(`[KnowledgeGraph] Source ${sourceId} extraction complete (${skillCount} skills)`);
+          newActiveJobs.delete(sourceId);
+          completedCount++;
+        }
+      }
+
+      if (completedCount > 0) {
+        setActiveJobs(newActiveJobs);
+
+        // Refresh graph data when jobs complete
+        mutate(notebookKeys.graph(notebookId));
+        mutate(notebookKeys.learningPath(notebookId));
+
+        // If all jobs done, stop extraction
+        if (newActiveJobs.size === 0) {
+          console.log('[KnowledgeGraph] All extraction jobs complete');
+          setIsExtracting(false);
+          setExtractionStartTime(null);
+          if (extractionTimerRef.current) {
+            clearInterval(extractionTimerRef.current);
+          }
+        }
+      }
+    }, POLL_INTERVAL);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [activeJobs, checkJobStatus, notebookId]);
+
   const triggerExtraction = useCallback(async (granularity: ExtractionGranularity = 'standard') => {
     setShowGranularityDialog(false);
     setIsExtracting(true);
@@ -212,48 +725,52 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
     setExtractionStep(0);
     setElapsedTime(0);
 
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/graph`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rebuild: true, granularity }),
-      });
+    // Get sources that are ready for extraction
+    const readySources = sources.filter(s => s.status === 'success');
 
-      // Handle timeout - extraction may still complete server-side
-      if (res.status === 502 || res.status === 504) {
-        console.log("[Graph] Request timed out, but extraction may still complete");
-        // Poll for results after a delay
-        setTimeout(() => {
-          mutate(notebookKeys.graph(notebookId));
-          mutate(notebookKeys.learningPath(notebookId));
-        }, 5000);
-        return; // Don't show error, extraction is likely still running
-      }
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || data.message || "Extraction failed");
-      }
-
-      // Revalidate graph data and learning path
-      mutate(notebookKeys.graph(notebookId));
-      mutate(notebookKeys.learningPath(notebookId));
-    } catch (err) {
-      // Network errors might mean timeout - check after delay
-      console.log("[Graph] Request failed, checking if extraction completed:", err);
-      setTimeout(() => {
-        mutate(notebookKeys.graph(notebookId));
-        mutate(notebookKeys.learningPath(notebookId));
-      }, 5000);
-    } finally {
+    if (readySources.length === 0) {
+      setExtractionError('No sources ready for extraction. Add sources first.');
       setIsExtracting(false);
-      setExtractionStartTime(null);
-      if (extractionTimerRef.current) {
-        clearInterval(extractionTimerRef.current);
+      return;
+    }
+
+    console.log(`[KnowledgeGraph] Starting extraction for ${readySources.length} sources`);
+
+    const newActiveJobs = new Map<string, string>();
+
+    // Create extraction job for each source using the job-based API
+    for (const source of readySources) {
+      try {
+        console.log(`[KnowledgeGraph] Creating extraction job for source ${source.id}`);
+        const res = await fetch(`/api/notebooks/${notebookId}/sources/${source.id}/graph`, {
+          method: "POST",
+        });
+
+        if (res.ok || res.status === 202) {
+          const data = await res.json();
+          if (data.jobId) {
+            newActiveJobs.set(source.id, data.jobId);
+            console.log(`[KnowledgeGraph] Job ${data.jobId} started for source ${source.id}`);
+          }
+        } else {
+          console.warn(`[KnowledgeGraph] Failed to create job for source ${source.id}`);
+        }
+      } catch (err) {
+        console.error(`[KnowledgeGraph] Error creating job for source ${source.id}:`, err);
       }
     }
-  }, [notebookId]);
+
+    if (newActiveJobs.size === 0) {
+      setExtractionError('Failed to start extraction jobs');
+      setIsExtracting(false);
+      setExtractionStartTime(null);
+      return;
+    }
+
+    // Start polling by setting active jobs
+    setActiveJobs(newActiveJobs);
+    console.log(`[KnowledgeGraph] ${newActiveJobs.size} extraction jobs started, polling for completion`);
+  }, [notebookId, sources]);
 
   const deleteGraph = useCallback(async () => {
     setIsDeleting(true);
@@ -487,6 +1004,17 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
               Entities ({entityCount})
             </button>
             <button
+              onClick={() => setActiveTab("fink")}
+              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                activeTab === "fink"
+                  ? "border-black text-black"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Layers className="h-3 w-3" />
+              Fink
+            </button>
+            <button
               onClick={() => setActiveTab("metadata")}
               className={`flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
                 activeTab === "metadata"
@@ -659,6 +1187,11 @@ export function KnowledgeGraphPanel({ notebookId, expanded }: KnowledgeGraphPane
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Fink's Taxonomy View */}
+          {activeTab === "fink" && (
+            <FinkTaxonomyView graphData={graphData} expanded={expanded} />
           )}
 
           {/* Meta Data View */}

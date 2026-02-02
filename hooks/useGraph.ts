@@ -15,6 +15,10 @@ export interface GraphSkill {
   // Educational psychology metadata
   bloomLevel?: number
   secondaryBloomLevels?: number[]
+  // Fink's Taxonomy of Significant Learning
+  finkDimensions?: string[]
+  finkPrimaryDimension?: string
+  finkIntegrations?: string // JSON string
   estimatedMinutes?: number
   difficulty?: number
   // IRT 3PL parameters

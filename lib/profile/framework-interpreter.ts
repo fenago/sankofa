@@ -6,6 +6,8 @@
  */
 
 import type { InverseProfile } from '@/lib/types/interactions'
+import type { FinkDimension } from '@/lib/types/graph'
+import { FINK_LABELS, FINK_DESCRIPTIONS } from '@/lib/types/graph'
 
 // ============================================
 // Types
@@ -16,6 +18,7 @@ export type FrameworkId =
   | 'irt'           // Item Response Theory
   | 'sm2'           // Spaced Repetition
   | 'bloom'         // Bloom's Taxonomy
+  | 'fink'          // Fink's Taxonomy of Significant Learning
   | 'cognitive_load' // Cognitive Load Theory
   | 'zpd'           // Zone of Proximal Development
   | 'threshold'     // Threshold Concepts
@@ -452,6 +455,150 @@ export function interpretBloom(
 }
 
 // ============================================
+// Fink's Taxonomy Interpreter
+// ============================================
+
+export type FinkDimensionStats = Record<FinkDimension, { total: number; mastered: number }>
+
+export function interpretFink(
+  skillsByDimension: FinkDimensionStats
+): FrameworkStatus {
+  const dimensions: FinkDimension[] = [
+    'foundational_knowledge',
+    'application',
+    'integration',
+    'human_dimension',
+    'caring',
+    'learning_how_to_learn',
+  ]
+
+  const totalSkills = dimensions.reduce((sum, d) => sum + (skillsByDimension[d]?.total ?? 0), 0)
+  const totalMastered = dimensions.reduce((sum, d) => sum + (skillsByDimension[d]?.mastered ?? 0), 0)
+
+  if (totalSkills === 0) {
+    return {
+      id: 'fink',
+      name: 'Fink\'s Taxonomy of Significant Learning',
+      shortName: 'Holistic Learning',
+      description: 'Tracks growth across six interconnected dimensions: knowledge, application, integration, human dimension, caring, and learning how to learn.',
+      researcher: 'L. Dee Fink',
+      year: 2003,
+      status: 'insufficient_data',
+      statusLabel: 'Not Enough Data',
+      score: null,
+      headline: 'No skills categorized yet',
+      interpretation: 'Skills will be categorized across Fink\'s six learning dimensions as content is extracted.',
+      recommendation: 'Add content to your notebook to see your holistic learning profile.',
+      icon: '🌐',
+      color: 'gray',
+      metrics: [],
+      dataQuality: 'insufficient',
+      dataPoints: 0,
+      minDataPoints: 5,
+    }
+  }
+
+  // Calculate mastery per dimension
+  const dimensionStats = dimensions.map(dim => ({
+    dimension: dim,
+    label: FINK_LABELS[dim],
+    description: FINK_DESCRIPTIONS[dim],
+    total: skillsByDimension[dim]?.total ?? 0,
+    mastered: skillsByDimension[dim]?.mastered ?? 0,
+    masteryPercent: skillsByDimension[dim]?.total > 0
+      ? Math.round((skillsByDimension[dim]?.mastered / skillsByDimension[dim]?.total) * 100)
+      : 0,
+  }))
+
+  // Find strongest and weakest dimensions (with at least 1 skill)
+  const activeDimensions = dimensionStats.filter(d => d.total > 0)
+  const sorted = [...activeDimensions].sort((a, b) => b.masteryPercent - a.masteryPercent)
+  const strongest = sorted[0]
+  const weakest = sorted[sorted.length - 1]
+
+  // Calculate balance score (how evenly distributed is mastery across dimensions)
+  const masteryPercentages = activeDimensions.map(d => d.masteryPercent)
+  const avgMastery = masteryPercentages.reduce((a, b) => a + b, 0) / masteryPercentages.length
+  const variance = masteryPercentages.reduce((sum, p) => sum + Math.pow(p - avgMastery, 2), 0) / masteryPercentages.length
+  const balanceScore = Math.max(0, 100 - Math.sqrt(variance)) // Higher is more balanced
+
+  const overallMastery = Math.round((totalMastered / totalSkills) * 100)
+
+  // Determine status based on overall mastery AND balance
+  let status: StatusLevel
+  if (overallMastery >= 70 && balanceScore >= 60) status = 'excellent'
+  else if (overallMastery >= 50 || balanceScore >= 50) status = 'good'
+  else if (overallMastery >= 25) status = 'developing'
+  else status = 'needs_attention'
+
+  // Generate interpretation
+  const coverageCount = activeDimensions.length
+  let interpretation: string
+  if (coverageCount === 6 && overallMastery >= 60) {
+    interpretation = 'You\'re developing holistically across all six dimensions of significant learning!'
+  } else if (coverageCount >= 4) {
+    interpretation = `You\'re engaging with ${coverageCount} of 6 dimensions. Your learning is well-rounded.`
+  } else {
+    interpretation = `You\'re focusing on ${coverageCount} dimension${coverageCount > 1 ? 's' : ''}. Consider exploring other types of learning.`
+  }
+
+  // Generate recommendation based on gaps
+  let recommendation: string
+  if (weakest && strongest && weakest.dimension !== strongest.dimension) {
+    if (weakest.masteryPercent < strongest.masteryPercent * 0.5) {
+      recommendation = `Strengthen "${FINK_LABELS[weakest.dimension]}" skills to balance your learning profile.`
+    } else {
+      recommendation = 'Great balance! Continue developing across all dimensions for holistic growth.'
+    }
+  } else {
+    recommendation = 'Add more content to reveal your full learning profile across all dimensions.'
+  }
+
+  // Check for specific dimension gaps
+  const metacognitiveGap = dimensionStats.find(d => d.dimension === 'learning_how_to_learn')
+  if (metacognitiveGap && metacognitiveGap.masteryPercent < 30 && metacognitiveGap.total > 0) {
+    recommendation = 'Focus on "Learning How to Learn" skills to become a more effective self-directed learner.'
+  }
+
+  const caringGap = dimensionStats.find(d => d.dimension === 'caring')
+  if (caringGap && caringGap.total === 0 && totalSkills > 10) {
+    interpretation += ' Consider how your learning connects to values and interests (Caring dimension).'
+  }
+
+  return {
+    id: 'fink',
+    name: 'Fink\'s Taxonomy of Significant Learning',
+    shortName: 'Holistic Learning',
+    description: 'Tracks growth across six interconnected dimensions: knowledge, application, integration, human dimension, caring, and learning how to learn.',
+    researcher: 'L. Dee Fink',
+    year: 2003,
+    status,
+    statusLabel: getStatusLabel(status),
+    score: overallMastery,
+    headline: strongest
+      ? `Strongest: "${FINK_LABELS[strongest.dimension]}" (${strongest.masteryPercent}%)`
+      : `${overallMastery}% overall mastery`,
+    interpretation,
+    recommendation,
+    icon: '🌐',
+    color: getStatusColor(status),
+    metrics: dimensions.map(dim => {
+      const stats = dimensionStats.find(d => d.dimension === dim)!
+      return {
+        key: dim,
+        label: FINK_LABELS[dim],
+        value: `${stats.mastered}/${stats.total}`,
+        description: FINK_DESCRIPTIONS[dim],
+        isGood: stats.masteryPercent >= 60 && stats.total > 0,
+      }
+    }),
+    dataQuality: totalSkills >= 20 ? 'good' : totalSkills >= 10 ? 'adequate' : 'limited',
+    dataPoints: totalSkills,
+    minDataPoints: 5,
+  }
+}
+
+// ============================================
 // Cognitive Load Interpreter
 // ============================================
 
@@ -563,11 +710,18 @@ export function interpretZPD(
 
   const zpdPercent = Math.round((zpdSkillCount / totalSkills) * 100)
   const remainingSkills = totalSkills - masteredCount
+  const masteryPercent = totalSkills > 0 ? Math.round((masteredCount / totalSkills) * 100) : 0
+
+  // Score combines mastery progress (70%) with ZPD availability (30%)
+  // This rewards actual learning, not just having skills available
+  const masteryComponent = masteryPercent * 0.7
+  const availabilityComponent = Math.min(30, zpdSkillCount * 3) // Cap at 30 points for having 10+ skills ready
+  const score = Math.round(masteryComponent + availabilityComponent)
 
   let status: StatusLevel
-  if (zpdSkillCount >= 10 || zpdPercent >= 30) status = 'excellent'
-  else if (zpdSkillCount >= 5 || zpdPercent >= 15) status = 'good'
-  else if (zpdSkillCount >= 1) status = 'developing'
+  if (masteryPercent >= 60 && zpdSkillCount >= 3) status = 'excellent'
+  else if (masteryPercent >= 30 && zpdSkillCount >= 3) status = 'good'
+  else if (masteryPercent >= 10 || zpdSkillCount >= 1) status = 'developing'
   else status = 'needs_attention'
 
   const recommendation = zpdSkillCount > 0
@@ -583,7 +737,7 @@ export function interpretZPD(
     year: 1978,
     status,
     statusLabel: getStatusLabel(status),
-    score: Math.min(100, zpdSkillCount * 10),
+    score,
     headline: `${zpdSkillCount} skills in your growth zone`,
     interpretation: zpdSkillCount > 0
       ? 'These are skills where you\'ve mastered the prerequisites and are ready to stretch.'
@@ -1214,6 +1368,7 @@ export function buildFrameworkDashboard(
     practice: { totalAttempts: number; avgDifficulty: number; avgAccuracy: number }
     sm2: { dueSkills: number; totalScheduled: number; overdueCount: number; avgInterval: number }
     bloom: Record<number, { total: number; mastered: number }>
+    fink: FinkDimensionStats
     sessions: { avgDurationMin: number; totalSessions: number }
     zpd: { zpdSkillCount: number }
     threshold: { total: number; mastered: number; inProgress: number }
@@ -1227,6 +1382,7 @@ export function buildFrameworkDashboard(
     interpretSM2(stats.sm2.dueSkills, stats.sm2.totalScheduled, stats.sm2.overdueCount, stats.sm2.avgInterval),
     // Curriculum & Structure
     interpretBloom(stats.bloom),
+    interpretFink(stats.fink),
     interpretZPD(stats.zpd.zpdSkillCount, stats.skills.mastered, stats.skills.total),
     interpretThreshold(stats.threshold, profile),
     // Learner Characteristics
